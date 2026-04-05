@@ -1,5 +1,4 @@
 ---
 deployment:
   tasks:
-    - /home/jacobspl/nodevenv/repositories/indkob/22/bin/npm install --omit=dev
-    - /bin/mkdir -p /home/jacobspl/repositories/indkob/data
+    - echo "Deployed"
