@@ -19,7 +19,8 @@ export async function renderShoppinglist(container) {
   container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-muted)">Henter indkøbsliste…</div>';
 
   setTopActions(`
-    <button class="top-action" id="btn-shop-menu" title="Muligheder">⋯</button>
+    <button class="top-action" id="btn-shop-print" title="Print indkøbsliste">🖨️</button>
+    <button class="top-action" id="btn-shop-menu"  title="Muligheder">⋯</button>
   `);
 
   try {
@@ -31,6 +32,9 @@ export async function renderShoppinglist(container) {
 
   renderList(container);
 
+  document.getElementById('btn-shop-print')?.addEventListener('click', () => {
+    printShoppingList();
+  });
   document.getElementById('btn-shop-menu')?.addEventListener('click', () => {
     showMenu(container);
   });
@@ -270,6 +274,66 @@ function showMenu(container) {
     closeSheet();
     openLibrarySheet(container);
   });
+}
+
+function printShoppingList() {
+  if (items.length === 0) { toast('Indkøbslisten er tom'); return; }
+
+  const groups = {};
+  for (const item of items) {
+    const cat = item.shop_category || 'Andet';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  }
+
+  const groupsHtml = SHOP_CATEGORIES.filter(c => groups[c]).map(cat => {
+    const rowsHtml = groups[cat].map(item => {
+      const amt = item.amount
+        ? `${item.amount} ${item.unit || ''}`.trim()
+        : (item.unit || '');
+      return `<div class="item${item.checked ? ' done' : ''}">
+        <span class="chk">${item.checked ? '☑' : '☐'}</span>
+        <span class="nm">${item.name}</span>
+        ${amt ? `<span class="am">${amt}</span>` : ''}
+      </div>`;
+    }).join('');
+    return `<div class="cat">
+      <div class="ch">${CAT_ICONS[cat] || '📦'} ${cat}</div>
+      ${rowsHtml}
+    </div>`;
+  }).join('');
+
+  const unchecked = items.filter(i => !i.checked).length;
+  const dateStr   = new Date().toLocaleDateString('da-DK', { weekday:'long', day:'numeric', month:'long' });
+
+  const html = `<!DOCTYPE html><html lang="da"><head><meta charset="UTF-8">
+<title>Indkøbsliste</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Arial,sans-serif;color:#111;padding:28px 36px;max-width:580px;margin:0 auto}
+h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
+.sub{font-size:.85rem;color:#777;margin-bottom:24px}
+.cat{margin-bottom:20px}
+.ch{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;padding-bottom:5px;border-bottom:1.5px solid #e0e0e0}
+.item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f2f2f2}
+.chk{font-size:1rem;flex-shrink:0;color:#555}
+.nm{flex:1;font-size:.93rem}
+.am{font-size:.85rem;color:#777;text-align:right;flex-shrink:0}
+.done .nm{text-decoration:line-through;opacity:.4}
+.foot{margin-top:24px;font-size:.72rem;color:#bbb}
+@media print{body{padding:8px}}
+</style></head><body>
+<h1>🛒 Indkøbsliste</h1>
+<p class="sub">${unchecked} varer mangler · ${dateStr}</p>
+${groupsHtml}
+<p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK')}</p>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
 }
 
 async function openLibrarySheet(container) {

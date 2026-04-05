@@ -1,6 +1,14 @@
 import { mealplan, recipes as recipesApi } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
 
+// Brug altid lokal tid — toISOString() giver UTC og forskydes en dag i CEST
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 const EXTRA_MEAL_TYPES = [
   { key: 'breakfast', label: 'Morgenmad' },
   { key: 'lunch',     label: 'Frokost' },
@@ -18,7 +26,7 @@ function getMonday(offset = 0) {
   return d;
 }
 
-function dateStr(d) { return d.toISOString().slice(0, 10); }
+function dateStr(d) { return localDateStr(d); }
 
 function formatDate(d) {
   return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short' });
@@ -47,7 +55,7 @@ function saveExpanded(set) {
 export async function renderMealplan(container) {
   container.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink-muted);font-family:var(--serif);font-style:italic;font-size:1.1rem">Henter madplan…</div>';
 
-  setTopActions('');
+  setTopActions(`<button class="top-action" id="btn-mp-print" title="Print madplan">🖨️</button>`);
 
   const monday = getMonday(weekOffset);
   const sunday = new Date(monday);
@@ -113,6 +121,10 @@ export async function renderMealplan(container) {
 
   nav.querySelector('#btn-prev').addEventListener('click', () => { weekOffset--; renderMealplan(container); });
   nav.querySelector('#btn-next').addEventListener('click', () => { weekOffset++; renderMealplan(container); });
+
+  document.getElementById('btn-mp-print')?.addEventListener('click', () => {
+    openMealplanPrintSheet(monday, sunday);
+  });
 }
 
 function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expandedDays, container) {
@@ -279,5 +291,121 @@ async function openRecipePicker(date, mealType, currentId, onDone) {
 
   const labels = { breakfast: 'Morgenmad', lunch: 'Frokost', dinner: 'Aftensmad' };
   openSheet(`Vælg ${labels[mealType]}`, frag);
+}
+
+// ── Print madplan ────────────────────────────────────────────────
+function openMealplanPrintSheet(monday, sunday) {
+  const frag = document.createElement('div');
+  frag.innerHTML = `
+    <p style="font-size:0.88rem;color:var(--ink-muted);margin-bottom:18px;line-height:1.5">
+      Vælg periode og tryk print. Siden åbner i et nyt vindue.
+    </p>
+    <div style="display:flex;gap:10px;margin-bottom:18px">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Fra</label>
+        <input class="form-input" id="pr-from" type="date" value="${dateStr(monday)}">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Til</label>
+        <input class="form-input" id="pr-to" type="date" value="${dateStr(sunday)}">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-full" id="btn-do-print">🖨️ Åbn og print</button>
+    <div style="height:12px"></div>
+  `;
+
+  openSheet('Print madplan', frag);
+
+  frag.querySelector('#btn-do-print').addEventListener('click', async () => {
+    const from = frag.querySelector('#pr-from').value;
+    const to   = frag.querySelector('#pr-to').value;
+    if (!from || !to || from > to) { toast('Vælg gyldige datoer'); return; }
+
+    const btn = frag.querySelector('#btn-do-print');
+    btn.disabled = true;
+    btn.textContent = 'Henter…';
+
+    try {
+      const entries = await mealplan.list(from, to);
+      execMealplanPrint(from, to, entries);
+      closeSheet();
+    } catch (e) {
+      toast('Fejl: ' + e.message);
+      btn.disabled = false;
+      btn.innerHTML = '🖨️ Åbn og print';
+    }
+  });
+}
+
+function execMealplanPrint(from, to, entries) {
+  const lookup = {};
+  for (const e of entries) {
+    if (!lookup[e.date]) lookup[e.date] = {};
+    lookup[e.date][e.meal_type] = e;
+  }
+
+  const days = [];
+  const cur  = new Date(from + 'T00:00:00');
+  const end  = new Date(to   + 'T00:00:00');
+  while (cur <= end) { days.push(localDateStr(cur)); cur.setDate(cur.getDate() + 1); }
+
+  const DAY_FULL   = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+  const MEAL_LABEL = { breakfast:'Morgenmad', lunch:'Frokost', dinner:'Aftensmad' };
+  const MEAL_ORDER = ['breakfast','lunch','dinner'];
+
+  const daysHtml = days.map(ds => {
+    const d       = new Date(ds + 'T00:00:00');
+    const dayName = DAY_FULL[d.getDay()];
+    const dateLbl = d.toLocaleDateString('da-DK', { day:'numeric', month:'long' });
+    const dayData = lookup[ds] || {};
+
+    const mealsHtml = MEAL_ORDER.map(mt => {
+      const e = dayData[mt];
+      if (!e) return '';
+      return `<div class="meal-row">
+        <span class="mt">${MEAL_LABEL[mt]}</span>
+        <span class="mn">${e.recipe_name}</span>
+        <span class="ms">${e.servings} pers.</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="day">
+      <div class="dh">${dayName} <span class="dl">${dateLbl}</span></div>
+      ${mealsHtml || '<div class="empty">Ingen retter</div>'}
+    </div>`;
+  }).join('');
+
+  const fromLbl = new Date(from+'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'long'});
+  const toLbl   = new Date(to  +'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'long'});
+
+  const html = `<!DOCTYPE html><html lang="da"><head><meta charset="UTF-8">
+<title>Madplan</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,Arial,sans-serif;color:#111;padding:28px 36px;max-width:680px;margin:0 auto}
+h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
+.sub{font-size:.9rem;color:#777;margin-bottom:24px}
+.day{margin-bottom:14px;border:1px solid #ddd;border-radius:8px;overflow:hidden}
+.dh{background:#f4f4f4;padding:8px 14px;font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.dl{font-weight:400;color:#888;text-transform:none;letter-spacing:0;font-size:.88rem}
+.meal-row{display:flex;align-items:center;padding:9px 14px;border-top:1px solid #f0f0f0;gap:12px}
+.mt{font-size:.68rem;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.05em;width:80px;flex-shrink:0}
+.mn{flex:1;font-size:.93rem}
+.ms{font-size:.8rem;color:#999;flex-shrink:0}
+.empty{padding:9px 14px;color:#bbb;font-size:.85rem;font-style:italic;border-top:1px solid #f0f0f0}
+.foot{margin-top:20px;font-size:.72rem;color:#bbb}
+@media print{body{padding:8px}}
+</style></head><body>
+<h1>📅 Madplan</h1>
+<p class="sub">${fromLbl} – ${toLbl}</p>
+${daysHtml}
+<p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK')}</p>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
 }
 
