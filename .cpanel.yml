@@ -1,6 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/jacobspl/repositories/indkob
-    - export HOME=/home/jacobspl && cd $DEPLOYPATH && npm install --production
-    - mkdir -p $DEPLOYPATH/data
+    - export HOME=/home/jacobspl && cd /home/jacobspl/repositories/indkob && npm install --production
+    - mkdir -p /home/jacobspl/repositories/indkob/data
