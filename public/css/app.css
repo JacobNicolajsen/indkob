@@ -502,6 +502,51 @@ html, body {
 }
 .meal-remove:active { opacity: 1; color: #9B2E1A; }
 
+/* Portions stepper */
+.servings-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  margin-right: 4px;
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+}
+
+.step-btn {
+  background: none;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+.step-btn:active {
+  background: var(--border);
+  color: var(--ink);
+}
+
+.step-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  min-width: 42px;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
 /* Extra meals expand section */
 .extra-meals-wrap {
   overflow: hidden;

@@ -169,8 +169,43 @@ function buildMealSlot(ds, mt, entry, expandedDays, container) {
   slot.innerHTML = `
     <span class="meal-type-label">${mt.label}</span>
     <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? entry.recipe_name : 'Tilføj ret…'}</span>
-    ${entry ? `<button class="meal-remove" data-id="${entry.id}" title="Fjern ret">✕</button>` : ''}
+    ${entry ? `
+      <div class="servings-stepper">
+        <button class="step-btn step-minus" aria-label="Færre portioner">−</button>
+        <span class="step-count">${entry.servings} pers.</span>
+        <button class="step-btn step-plus" aria-label="Flere portioner">+</button>
+      </div>
+      <button class="meal-remove" data-id="${entry.id}" title="Fjern ret">✕</button>
+    ` : ''}
   `;
+
+  if (entry) {
+    const stepper  = slot.querySelector('.servings-stepper');
+    const countEl  = stepper.querySelector('.step-count');
+    let servings   = entry.servings || 4;
+
+    // Stop propagation så klik på stepper ikke åbner opskriftsvælger
+    stepper.addEventListener('click', e => e.stopPropagation());
+
+    const applyServings = async (newVal) => {
+      countEl.textContent = `${newVal} pers.`;
+      try {
+        await mealplan.set(ds, mt.key, entry.recipe_id, newVal);
+      } catch {
+        toast('Kunne ikke opdatere portioner');
+        countEl.textContent = `${servings} pers.`;
+        return;
+      }
+      servings = newVal;
+    };
+
+    stepper.querySelector('.step-minus').addEventListener('click', () => {
+      if (servings > 1) applyServings(servings - 1);
+    });
+    stepper.querySelector('.step-plus').addEventListener('click', () => {
+      applyServings(servings + 1);
+    });
+  }
 
   slot.addEventListener('click', async (e) => {
     if (e.target.classList.contains('meal-remove')) {
