@@ -1,4 +1,4 @@
-import { recipes as api } from '../api.js';
+import { recipes as api, ai } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
 import { openProductPicker } from './catalog.js';
 import { UNITS, RECIPE_CATEGORIES, CAT_ICONS, unitOptions, catOptions } from '../constants.js';
@@ -7,7 +7,10 @@ let searchTimeout = null;
 let currentSearch = '';
 
 export async function renderRecipes(container) {
-  setTopActions(`<button class="top-action" id="btn-add-recipe" title="Ny opskrift">＋</button>`);
+  setTopActions(`
+    <button class="top-action" id="btn-ai-import" title="Importer fra link">✨</button>
+    <button class="top-action" id="btn-add-recipe" title="Ny opskrift">＋</button>
+  `);
   container.innerHTML = '';
 
   // Søgebar
@@ -54,6 +57,9 @@ export async function renderRecipes(container) {
     renderRecipes(container);
   });
 
+  document.getElementById('btn-ai-import')?.addEventListener('click', () => {
+    openAiImport(() => renderRecipes(container));
+  });
   document.getElementById('btn-add-recipe')?.addEventListener('click', () => {
     openRecipeForm(null, () => renderRecipes(container));
   });
@@ -151,6 +157,88 @@ async function openRecipeDetail(id, container) {
     closeSheet();
     toast('Opskrift slettet');
     renderRecipes(container);
+  });
+}
+
+function openAiImport(onDone) {
+  const frag = document.createElement('div');
+  frag.innerHTML = `
+    <div class="ai-import-hero">
+      <div class="ai-import-icon">✨</div>
+      <p class="ai-import-desc">
+        Indsæt et link til en opskrift — Claude læser siden og opretter opskriften
+        i dit katalog inkl. fremgangsmåde. Manglende varer oprettes automatisk.
+      </p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Link til opskrift</label>
+      <input class="form-input" id="ai-url" type="url"
+        placeholder="https://mad.dk/opskrift/…" autocomplete="off" autocorrect="off">
+    </div>
+    <button class="btn btn-primary btn-full" id="btn-ai-go">
+      Importer opskrift
+    </button>
+    <div id="ai-status" style="display:none"></div>
+    <div style="height:8px"></div>
+  `;
+
+  openSheet('Importer fra link', frag);
+
+  const urlInput = frag.querySelector('#ai-url');
+  const goBtn    = frag.querySelector('#btn-ai-go');
+  const status   = frag.querySelector('#ai-status');
+
+  // Indsæt evt. URL fra clipboard
+  navigator.clipboard?.readText?.().then(text => {
+    if (text?.startsWith('http') && !urlInput.value) urlInput.value = text;
+  }).catch(() => {});
+
+  const setStatus = (html, type = 'info') => {
+    status.style.display = 'block';
+    status.className = `ai-status ai-status--${type}`;
+    status.innerHTML = html;
+  };
+
+  goBtn.addEventListener('click', async () => {
+    const url = urlInput.value.trim();
+    if (!url.startsWith('http')) { toast('Indsæt et gyldigt link (starter med http)'); return; }
+
+    goBtn.disabled = true;
+    goBtn.textContent = 'Analyserer…';
+    setStatus(`
+      <div class="ai-loading">
+        <span class="ai-spinner"></span>
+        <span>Claude læser opskriften — det tager 10–20 sekunder…</span>
+      </div>`, 'info');
+
+    try {
+      const result = await ai.importRecipe(url);
+
+      const newProds = result.new_products?.length
+        ? `<div class="ai-new-prods">
+             <strong>${result.new_products.length} nye varer oprettet i kataloget:</strong>
+             <span>${result.new_products.join(', ')}</span>
+           </div>`
+        : '';
+
+      setStatus(`
+        <div class="ai-success-card">
+          <div class="ai-success-title">✅ ${result.name}</div>
+          <div class="ai-success-meta">${result.ingredients_count} ingredienser importeret</div>
+          ${newProds}
+        </div>`, 'success');
+
+      goBtn.textContent = 'Importer endnu en';
+      goBtn.disabled = false;
+      urlInput.value = '';
+
+      toast(`"${result.name}" oprettet`);
+      onDone();
+    } catch (e) {
+      setStatus(`<div class="ai-error">⚠️ ${e.message}</div>`, 'error');
+      goBtn.textContent = 'Prøv igen';
+      goBtn.disabled = false;
+    }
   });
 }
 

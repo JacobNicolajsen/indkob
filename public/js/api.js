@@ -60,8 +60,7 @@ export const shoppinglist = {
   },
 };
 
-// ── Claude AI — placeholder, klar til integration ────────────────
-// export const ai = {
-//   suggestMealPlan: (prefs) => req('POST', '/ai/suggest-mealplan', prefs),
-//   suggestRecipes:  (query) => req('POST', '/ai/suggest-recipes', { query }),
-// };
+// ── Claude AI ────────────────────────────────────────────────────
+export const ai = {
+  importRecipe: (url) => req('POST', '/ai/import-recipe', { url }),
+};

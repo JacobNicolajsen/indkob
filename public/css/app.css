@@ -879,3 +879,95 @@ html, body {
   position: relative;
   z-index: 1;
 }
+
+/* =====================================================
+   AI IMPORT — Opskriftsimport fra link
+   ===================================================== */
+
+.ai-import-hero {
+  text-align: center;
+  padding: 8px 4px 20px;
+}
+
+.ai-import-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+  line-height: 1;
+}
+
+.ai-import-desc {
+  font-size: 0.88rem;
+  color: var(--ink-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Status boks */
+.ai-status {
+  margin-top: 14px;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 0.88rem;
+}
+
+.ai-status--info    { background: var(--amber-light); }
+.ai-status--success { background: var(--sage-light); }
+.ai-status--error   { background: var(--terra-light); color: var(--terra-deep); }
+
+/* Loading spinner */
+.ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-muted);
+}
+
+@keyframes ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: ai-spin 0.8s linear infinite;
+}
+
+/* Success card */
+.ai-success-card {
+  color: var(--sage);
+}
+
+.ai-success-title {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.ai-success-meta {
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+
+.ai-new-prods {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  background: rgba(255,255,255,0.6);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ai-new-prods strong { color: var(--ink); }
+
+.ai-error { color: var(--terra-deep); }

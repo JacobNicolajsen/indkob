@@ -19,6 +19,7 @@ app.use('/api/products',     require('./server/routes/products'));
 app.use('/api/recipes',      require('./server/routes/recipes'));
 app.use('/api/mealplan',     require('./server/routes/mealplan'));
 app.use('/api/shoppinglist', require('./server/routes/shoppinglist'));
+app.use('/api/ai',           require('./server/routes/ai'));
 
 app.get('*', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
