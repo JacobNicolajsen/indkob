@@ -7,6 +7,18 @@ const VALID_UNITS = ['stk','g','kg','ml','dl','L','tsk','spsk','fed','bundt','d�
 const VALID_SHOP  = ['Frugt & Grønt','Kød & Fisk','Mejeri & Æg','Brød & Bageri','Kolonial','Frost','Drikkevarer','Husholdning','Andet'];
 const VALID_CAT   = ['Kød','Fjerkræ','Fisk','Vegetar','Pasta','Suppe','Salat','Tilbehør','Dessert','Morgenmad','Andet'];
 
+// GET /api/ai/models — vis tilgængelige modeller
+router.get('/models', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: 'Ingen API-nøgle' });
+  try {
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const list = await client.models.list();
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/ai/import-recipe  { url }
 router.post('/import-recipe', async (req, res) => {
   const { url } = req.body;
