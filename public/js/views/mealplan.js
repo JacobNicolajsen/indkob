@@ -167,15 +167,17 @@ function buildMealSlot(ds, mt, entry, expandedDays, container) {
   const slot = document.createElement('div');
   slot.className = 'meal-slot';
   slot.innerHTML = `
-    <span class="meal-type-label">${mt.label}</span>
-    <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? entry.recipe_name : 'Tilføj ret…'}</span>
+    <div class="meal-slot-top">
+      <span class="meal-type-label">${mt.label}</span>
+      <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? entry.recipe_name : 'Tilføj ret…'}</span>
+      ${entry ? `<button class="meal-remove" data-id="${entry.id}" title="Fjern ret">✕</button>` : ''}
+    </div>
     ${entry ? `
       <div class="servings-stepper">
         <button class="step-btn step-minus" aria-label="Færre portioner">−</button>
         <span class="step-count">${entry.servings} pers.</span>
         <button class="step-btn step-plus" aria-label="Flere portioner">+</button>
       </div>
-      <button class="meal-remove" data-id="${entry.id}" title="Fjern ret">✕</button>
     ` : ''}
   `;
 

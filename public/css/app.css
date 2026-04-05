@@ -451,8 +451,8 @@ html, body {
 /* Meal slot */
 .meal-slot {
   display: flex;
-  align-items: center;
-  padding: 13px 16px;
+  flex-direction: column;
+  padding: 11px 16px 10px;
   border-top: 1px solid var(--border);
   gap: 10px;
   cursor: pointer;
@@ -502,17 +502,25 @@ html, body {
 }
 .meal-remove:active { opacity: 1; color: #9B2E1A; }
 
+/* Meal slot top row */
+.meal-slot-top {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
 /* Portions stepper */
 .servings-stepper {
   display: flex;
   align-items: center;
   gap: 0;
-  flex-shrink: 0;
-  margin-right: 4px;
+  margin-left: 60px;
+  margin-top: 5px;
   background: var(--bg);
   border-radius: 20px;
   padding: 2px 4px;
   border: 1px solid var(--border);
+  align-self: flex-start;
 }
 
 .step-btn {
