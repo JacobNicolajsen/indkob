@@ -1,8 +1,22 @@
 const express = require('express');
 const path    = require('path');
+const fs      = require('fs');
 const app     = express();
 
 app.use(express.json());
+
+// Debug: log every request URL to file so we can see what LiteSpeed sends
+app.use((req, res, next) => {
+  fs.appendFileSync(
+    path.join(__dirname, 'access.log'),
+    `${new Date().toISOString()} ${req.method} "${req.url}"\n`
+  );
+  next();
+});
+
+// Debug endpoint — returns the raw URL before any stripping
+app.get('/_debug', (req, res) => res.json({ url: req.url, pid: process.pid }));
+app.get('/indkob/_debug', (req, res) => res.json({ url: req.url, pid: process.pid }));
 
 // Strip mount prefix when deployed at a subpath (e.g. /indkob via cPanel Passenger)
 app.use((req, res, next) => {
