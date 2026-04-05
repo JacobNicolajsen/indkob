@@ -1,5 +1,5 @@
 ---
 deployment:
   tasks:
-    - export HOME=/home/jacobspl && cd /home/jacobspl/repositories/indkob && npm install --production
-    - mkdir -p /home/jacobspl/repositories/indkob/data
+    - "/bin/bash -c 'export HOME=/home/jacobspl; cd /home/jacobspl/repositories/indkob; /usr/local/bin/npm install --production'"
+    - "/bin/mkdir -p /home/jacobspl/repositories/indkob/data"
