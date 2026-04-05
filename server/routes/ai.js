@@ -47,7 +47,7 @@ router.post('/import-recipe', async (req, res) => {
   let parsed;
   try {
     const msg = await client.messages.create({
-      model:      'claude-3-5-haiku-20241022',
+      model:      'claude-3-haiku-20240307',
       max_tokens: 4096,
       system: `Du er en præcis opskrifts-ekstraktor. Du returnerer KUN valid JSON — ingen markdown, ingen forklaring, ingen kommentarer.`,
       messages: [{
