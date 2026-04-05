@@ -2,14 +2,15 @@
   "name": "Indkøbsassistent",
   "short_name": "Indkøb",
   "description": "Madplan og indkøbsliste",
-  "start_url": "/",
+  "start_url": "/indkob/",
+  "scope": "/indkob/",
   "display": "standalone",
   "background_color": "#F7F3EE",
   "theme_color": "#1E1410",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/icons/icon.svg",
+      "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
