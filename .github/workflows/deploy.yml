@@ -1,0 +1,24 @@
+name: Deploy til cPanel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host:     ${{ secrets.CPANEL_HOST }}
+          username: ${{ secrets.CPANEL_USER }}
+          password: ${{ secrets.CPANEL_PASS }}
+          script: |
+            cd ~/indkobsassistent
+            git pull origin main
+            npm install --production
+            # Genstart Node.js appen via cPanel's passenger restart
+            touch tmp/restart.txt

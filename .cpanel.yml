@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/<DIT_CPANEL_BRUGERNAVN>/indkobsassistent
+    - /bin/cp -r . $DEPLOYPATH
+    - export HOME=/home/<DIT_CPANEL_BRUGERNAVN> && cd $DEPLOYPATH && /usr/local/bin/node /usr/local/bin/npm install --production

@@ -1,0 +1,16 @@
+{
+  "name": "indkobsassistent",
+  "version": "1.0.0",
+  "description": "Indkøbsassistent med madplan og opskrifter",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
