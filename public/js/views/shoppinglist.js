@@ -331,23 +331,28 @@ function printShoppingList() {
 <title>Indkøbsliste</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,Arial,sans-serif;color:#111;padding:28px 36px;max-width:580px;margin:0 auto}
-h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
-.sub{font-size:.85rem;color:#777;margin-bottom:24px}
-.cat{margin-bottom:20px}
-.ch{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px;padding-bottom:5px;border-bottom:1.5px solid #e0e0e0}
-.item{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f2f2f2}
-.chk{font-size:1rem;flex-shrink:0;color:#555}
-.nm{flex:1;font-size:.93rem}
-.am{font-size:.85rem;color:#777;text-align:right;flex-shrink:0}
-.done .nm{text-decoration:line-through;opacity:.4}
-.foot{margin-top:24px;font-size:.72rem;color:#bbb}
-@media print{body{padding:8px}}
+body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px 24px;max-width:900px;margin:0 auto;font-size:13px}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
+.sub{font-size:.85rem;color:#555;margin-bottom:16px}
+.cols{column-count:2;column-gap:32px}
+.cat{margin-bottom:16px;break-inside:avoid}
+.ch{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:4px;border-bottom:2px solid #ccc}
+.item{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid #eee}
+.chk{font-size:.95rem;flex-shrink:0;color:#444;width:16px}
+.nm{flex:1;font-size:.92rem;line-height:1.3}
+.am{font-size:.88rem;color:#444;font-weight:600;text-align:right;flex-shrink:0;white-space:nowrap}
+.done .nm{text-decoration:line-through;opacity:.35}
+.foot{margin-top:20px;font-size:.7rem;color:#aaa;border-top:1px solid #eee;padding-top:8px}
+@media print{
+  body{padding:6px 10px;font-size:12px}
+  h1{font-size:1.2rem}
+  .cols{column-count:2}
+}
 </style></head><body>
 <h1>🛒 Indkøbsliste</h1>
-<p class="sub">${unchecked} varer mangler · ${dateStr}</p>
-${groupsHtml}
-<p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK')}</p>
+<p class="sub">${unchecked} af ${items.length} varer mangler · ${dateStr}</p>
+<div class="cols">${groupsHtml}</div>
+<p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
 </body></html>`;
 
   const w = window.open('', '_blank');

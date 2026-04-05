@@ -15,7 +15,11 @@ function recalculateShoppingList(db) {
     ).all().map(r => r.n)
   );
 
-  // Hent alle madplan-poster med opskrift-ingredienser og produktinfo
+  // Kun madplan fra dags dato og frem
+  const now      = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+  // Hent madplan-poster fra i dag og frem med opskrift-ingredienser og produktinfo
   const entries = db.prepare(`
     SELECT
       mp.servings  AS mp_servings,
@@ -31,8 +35,9 @@ function recalculateShoppingList(db) {
     JOIN recipes r             ON r.id  = mp.recipe_id
     JOIN recipe_ingredients ri ON ri.recipe_id = r.id
     JOIN products p            ON p.id  = ri.product_id
+    WHERE mp.date >= ?
     ORDER BY mp.date, mp.meal_type
-  `).all();
+  `).all(todayStr);
 
   // Aggregér: samme produkt + enhed summeres; kildeinfo samles
   const agg = {};

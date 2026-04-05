@@ -15,13 +15,12 @@ const EXTRA_MEAL_TYPES = [
 ];
 const DINNER = { key: 'dinner', label: 'Aftensmad' };
 
-const DAY_NAMES = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'];
+// Uge starter søndag (JS getDay() = 0)
+const DAY_NAMES = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'];
 
-function getMonday(offset = 0) {
+function getSunday(offset = 0) {
   const d = new Date();
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1 - day) + offset * 7;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() - d.getDay() + offset * 7); // gå tilbage til søndag
   d.setHours(0, 0, 0, 0);
   return d;
 }
@@ -57,13 +56,13 @@ export async function renderMealplan(container) {
 
   setTopActions(`<button class="top-action" id="btn-mp-print" title="Print madplan">🖨️</button>`);
 
-  const monday = getMonday(weekOffset);
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
+  const sunday   = getSunday(weekOffset);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
 
   let entries = [];
   try {
-    entries = await mealplan.list(dateStr(monday), dateStr(sunday));
+    entries = await mealplan.list(dateStr(sunday), dateStr(saturday));
   } catch (e) {
     container.innerHTML = `<div class="card" style="color:#9B2E1A">${e.message}</div>`;
     return;
@@ -76,8 +75,8 @@ export async function renderMealplan(container) {
 
   // Auto-udvidelse: hvis en dag allerede har morgenmad/frokost, vis dem
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
     const ds = dateStr(d);
     if (lookup[`${ds}|breakfast`] || lookup[`${ds}|lunch`]) {
       expandedDays.add(ds);
@@ -87,13 +86,14 @@ export async function renderMealplan(container) {
   container.innerHTML = '';
 
   // ---- Uge-navigation ----
-  const weekNo = getWeekNumber(monday);
+  const mondayOfWeek = new Date(sunday); mondayOfWeek.setDate(sunday.getDate() + 1);
+  const weekNo = getWeekNumber(mondayOfWeek);
   const nav = document.createElement('div');
   nav.className = 'week-nav';
   nav.innerHTML = `
     <button class="week-nav-btn" id="btn-prev">‹</button>
     <div class="week-label">
-      ${formatDate(monday)} – ${formatDate(sunday)}
+      ${formatDate(sunday)} – ${formatDate(saturday)}
       <span class="week-num">Uge ${weekNo}</span>
     </div>
     <button class="week-nav-btn" id="btn-next">›</button>
@@ -104,8 +104,8 @@ export async function renderMealplan(container) {
 
   // ---- Render dag-kort ----
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
     const ds = dateStr(d);
     const isToday = ds === today;
     const isExpanded = expandedDays.has(ds);
@@ -123,7 +123,7 @@ export async function renderMealplan(container) {
   nav.querySelector('#btn-next').addEventListener('click', () => { weekOffset++; renderMealplan(container); });
 
   document.getElementById('btn-mp-print')?.addEventListener('click', () => {
-    openMealplanPrintSheet(monday, sunday);
+    openMealplanPrintSheet(sunday, saturday);
   });
 }
 
@@ -131,12 +131,13 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
   const card = document.createElement('div');
   card.className = 'day-card';
 
-  // ---- Dag-header ----
+  // ---- Dag-header med + knap ----
   const header = document.createElement('div');
   header.className = `day-header${isToday ? ' is-today' : ''}`;
   header.innerHTML = `
     <span class="day-name">${DAY_NAMES[dayIndex]}</span>
     <span class="date-chip">${isToday ? 'I dag · ' : ''}${formatDate(dateObj)}</span>
+    <button class="day-expand-btn${isExpanded ? ' open' : ''}" title="Morgenmad & frokost">+</button>
   `;
   card.appendChild(header);
 
@@ -152,26 +153,16 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
   // ---- Aftensmad (altid synlig) ----
   card.appendChild(buildMealSlot(ds, DINNER, lookup[`${ds}|${DINNER.key}`], expandedDays, container));
 
-  // ---- Toggle morgenmad/frokost ----
-  const toggleBtn = document.createElement('button');
-  toggleBtn.className = `toggle-extra-meals${isExpanded ? ' open' : ''}`;
-  toggleBtn.innerHTML = `<span class="toggle-icon">+</span>${isExpanded ? 'Skjul morgenmad & frokost' : 'Tilføj morgenmad & frokost'}`;
-
-  toggleBtn.addEventListener('click', () => {
+  // ---- Toggle via + knap i headeren ----
+  header.querySelector('.day-expand-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     const opening = !extraWrap.classList.contains('open');
     extraWrap.classList.toggle('open', opening);
-    toggleBtn.classList.toggle('open', opening);
-    toggleBtn.innerHTML = `<span class="toggle-icon">+</span>${opening ? 'Skjul morgenmad & frokost' : 'Tilføj morgenmad & frokost'}`;
-
-    if (opening) {
-      expandedDays.add(ds);
-    } else {
-      expandedDays.delete(ds);
-    }
+    e.currentTarget.classList.toggle('open', opening);
+    if (opening) expandedDays.add(ds);
+    else         expandedDays.delete(ds);
     saveExpanded(expandedDays);
   });
-
-  card.appendChild(toggleBtn);
   return card;
 }
 
