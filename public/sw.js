@@ -1,16 +1,16 @@
-const CACHE = 'indkob-v2';
+const CACHE = 'indkob-v3';
 const STATIC = [
-  '/',
-  '/js/app.js',
-  '/js/api.js',
-  '/js/constants.js',
-  '/js/views/mealplan.js',
-  '/js/views/recipes.js',
-  '/js/views/shoppinglist.js',
-  '/js/views/catalog.js',
-  '/js/views/more.js',
-  '/css/app.css',
-  '/manifest.json'
+  '/indkob/',
+  '/indkob/js/app.js',
+  '/indkob/js/api.js',
+  '/indkob/js/constants.js',
+  '/indkob/js/views/mealplan.js',
+  '/indkob/js/views/recipes.js',
+  '/indkob/js/views/shoppinglist.js',
+  '/indkob/js/views/catalog.js',
+  '/indkob/js/views/more.js',
+  '/indkob/css/app.css',
+  '/indkob/manifest.json'
 ];
 
 self.addEventListener('install', e => {
@@ -31,7 +31,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
   // API-kald: altid netværk, fallback til cache ved fejl
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.includes('/api/')) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match(e.request))
     );

@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = `${new URL('.', document.baseURI).pathname}api`;
 
 async function req(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };

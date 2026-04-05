@@ -119,7 +119,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 });
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(console.warn);
+  navigator.serviceWorker.register(new URL('../sw.js', import.meta.url)).catch(console.warn);
 }
 
 navigate('mealplan');
