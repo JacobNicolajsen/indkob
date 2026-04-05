@@ -11,7 +11,7 @@ db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
 // ─── Schema-version ───────────────────────────────────────────────
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 const version = db.prepare('PRAGMA user_version').get()['user_version'];
 const recipesExists = db.prepare(
   "SELECT name FROM sqlite_master WHERE type='table' AND name='recipes'"
@@ -145,6 +145,17 @@ if (version < 1 && !recipesExists) {
     db.exec('PRAGMA foreign_keys = ON');
   }
   db.exec(`PRAGMA user_version = ${CURRENT_VERSION}`);
+}
+
+// ── Migration v2 → v3: sources-kolonne på shopping_list ──────────
+if (version < 3) {
+  try {
+    db.exec(`ALTER TABLE shopping_list ADD COLUMN sources TEXT DEFAULT '[]'`);
+  } catch (e) {
+    // Kolonnen eksisterer allerede — ignorer
+    if (!e.message.includes('duplicate column')) throw e;
+  }
+  db.exec(`PRAGMA user_version = 3`);
 }
 
 module.exports = db;

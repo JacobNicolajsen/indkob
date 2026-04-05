@@ -730,7 +730,7 @@ html, body {
 .shop-item {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
+  padding: 11px 16px;
   border-bottom: 1px solid var(--border);
   gap: 14px;
   background: var(--surface);
@@ -743,6 +743,17 @@ html, body {
   text-decoration: line-through;
   color: var(--border);
 }
+
+.shop-sources {
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.8;
+}
+
+.shop-item.checked .shop-sources { opacity: 0.4; }
 
 .shop-check {
   width: 26px; height: 26px;
@@ -772,8 +783,15 @@ html, body {
 
 .shop-item.checked .shop-check::after { display: block; }
 
-.shop-name {
+.shop-name-wrap {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shop-name {
   font-size: 0.95rem;
   font-weight: 500;
   color: var(--ink);

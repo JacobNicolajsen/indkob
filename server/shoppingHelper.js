@@ -19,18 +19,22 @@ function recalculateShoppingList(db) {
   const entries = db.prepare(`
     SELECT
       mp.servings  AS mp_servings,
+      mp.date      AS mp_date,
+      mp.meal_type AS mp_meal_type,
       r.servings   AS r_servings,
+      r.name       AS recipe_name,
       p.name       AS product_name,
       p.shop_category,
       ri.amount,
       ri.unit
     FROM meal_plan mp
-    JOIN recipes r            ON r.id  = mp.recipe_id
+    JOIN recipes r             ON r.id  = mp.recipe_id
     JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-    JOIN products p           ON p.id  = ri.product_id
+    JOIN products p            ON p.id  = ri.product_id
+    ORDER BY mp.date, mp.meal_type
   `).all();
 
-  // Aggregér: samme produkt + enhed summeres
+  // Aggregér: samme produkt + enhed summeres; kildeinfo samles
   const agg = {};
   for (const e of entries) {
     const ratio = e.mp_servings / (e.r_servings || 4);
@@ -40,12 +44,18 @@ function recalculateShoppingList(db) {
       if (e.amount !== null) {
         agg[key].amount = Math.round(((agg[key].amount || 0) + e.amount * ratio) * 100) / 100;
       }
+      // Tilføj kilde hvis ikke allerede registreret for denne dato+ret
+      const src = { recipe_name: e.recipe_name, date: e.mp_date, meal_type: e.mp_meal_type };
+      if (!agg[key].sources.some(s => s.date === src.date && s.meal_type === src.meal_type)) {
+        agg[key].sources.push(src);
+      }
     } else {
       agg[key] = {
         name:          e.product_name,
         amount:        e.amount !== null ? Math.round(e.amount * ratio * 100) / 100 : null,
         unit:          e.unit,
         shop_category: e.shop_category,
+        sources:       [{ recipe_name: e.recipe_name, date: e.mp_date, meal_type: e.mp_meal_type }],
       };
     }
   }
@@ -56,13 +66,14 @@ function recalculateShoppingList(db) {
     db.prepare("DELETE FROM shopping_list WHERE source = 'recipe'").run();
 
     const insert = db.prepare(`
-      INSERT INTO shopping_list (name, amount, unit, shop_category, source, checked)
-      VALUES (?, ?, ?, ?, 'recipe', ?)
+      INSERT INTO shopping_list (name, amount, unit, shop_category, source, checked, sources)
+      VALUES (?, ?, ?, ?, 'recipe', ?, ?)
     `);
 
     for (const item of Object.values(agg)) {
       const checked = checkedNames.has(item.name.toLowerCase()) ? 1 : 0;
-      insert.run(item.name, item.amount, item.unit, item.shop_category, checked);
+      insert.run(item.name, item.amount, item.unit, item.shop_category, checked,
+        JSON.stringify(item.sources || []));
     }
 
     db.exec('COMMIT');

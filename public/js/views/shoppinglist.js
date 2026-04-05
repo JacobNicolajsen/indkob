@@ -105,9 +105,30 @@ function buildShopItem(item, container) {
     ? `${Number(item.amount) % 1 === 0 ? item.amount : item.amount} ${item.unit || ''}`.trim()
     : item.unit || '';
 
+  // Kilde-labels (hvilke retter + datoer)
+  let sourcesHtml = '';
+  if (item.source === 'recipe' && item.sources) {
+    try {
+      const srcs = typeof item.sources === 'string' ? JSON.parse(item.sources) : item.sources;
+      if (srcs?.length) {
+        const DAY = ['Søn','Man','Tir','Ons','Tor','Fre','Lør'];
+        const labels = srcs.map(s => {
+          const d   = new Date(s.date + 'T00:00:00');
+          const day = DAY[d.getDay()];
+          const dt  = d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' });
+          return `${s.recipe_name} · ${day} ${dt}`;
+        });
+        sourcesHtml = `<span class="shop-sources">${labels.join(' &nbsp;·&nbsp; ')}</span>`;
+      }
+    } catch { /* ignorer parse-fejl */ }
+  }
+
   el.innerHTML = `
     <div class="shop-check" title="Marker"></div>
-    <span class="shop-name">${item.name}</span>
+    <div class="shop-name-wrap">
+      <span class="shop-name">${item.name}</span>
+      ${sourcesHtml}
+    </div>
     ${amountText ? `<span class="shop-amount">${amountText}</span>` : ''}
     <button class="shop-delete" title="Fjern">🗑</button>
   `;
