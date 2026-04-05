@@ -3,6 +3,16 @@ const path    = require('path');
 const app     = express();
 
 app.use(express.json());
+
+// Strip mount prefix when deployed at a subpath (e.g. /indkob via cPanel Passenger)
+app.use((req, res, next) => {
+  const mount = process.env.MOUNT_PATH || '';
+  if (mount && req.url.startsWith(mount)) {
+    req.url = req.url.slice(mount.length) || '/';
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/api/products',     require('./server/routes/products'));
