@@ -6,8 +6,8 @@ app.use(express.json());
 
 // Strip mount prefix when deployed at a subpath (e.g. /indkob via cPanel Passenger)
 app.use((req, res, next) => {
-  const mount = process.env.MOUNT_PATH || '';
-  if (mount && req.url.startsWith(mount)) {
+  const mount = '/indkob';
+  if (req.url.startsWith(mount + '/') || req.url === mount) {
     req.url = req.url.slice(mount.length) || '/';
   }
   next();
