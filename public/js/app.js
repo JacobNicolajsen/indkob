@@ -114,19 +114,45 @@ export function setTopActions(html) {
   document.getElementById('top-actions').innerHTML = html;
 }
 
-// ── PWA-kompatibel print (undgår window.open der blokeres i webapp-tilstand) ──
+// ── Print via Blob-URL — virker i PWA/webapp på iOS ─────────────
+// Navigerer samme tab til en blob: HTML-side med toolbar.
+// Brugeren trykker Print eller bruger Del-knappen i Safari.
 
-export function printHtml(html) {
-  let overlay = document.getElementById('print-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'print-overlay';
-    document.body.appendChild(overlay);
-  }
-  overlay.innerHTML = html;
+export function printHtml(bodyHtml) {
+  const fullHtml = `<!DOCTYPE html><html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Print</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    .ptb{
+      position:fixed;top:0;left:0;right:0;
+      background:#1E1410;color:#fff;
+      display:flex;align-items:center;gap:10px;
+      padding:12px 16px;z-index:100;
+    }
+    .ptb button{
+      background:none;border:1px solid rgba(255,255,255,.35);
+      color:#fff;border-radius:8px;padding:7px 14px;
+      font-size:.9rem;cursor:pointer;
+    }
+    .ptb .pbtn{background:#B85C38;border-color:#B85C38;font-weight:600}
+    body{padding-top:56px}
+    @media print{.ptb{display:none}body{padding-top:0}}
+  </style>
+</head>
+<body>
+  <div class="ptb">
+    <button onclick="history.back()">‹ Tilbage</button>
+    <button class="pbtn" onclick="window.print()">🖨️ Print</button>
+  </div>
+  ${bodyHtml}
+</body>
+</html>`;
 
-  window.addEventListener('afterprint', () => { overlay.innerHTML = ''; }, { once: true });
-  window.print();
+  const blob = new Blob([fullHtml], { type: 'text/html' });
+  window.location.href = URL.createObjectURL(blob);
 }
 
 // ── Init ─────────────────────────────────────────────────────────
