@@ -75,13 +75,25 @@ function renderList(container) {
       for (const item of groups[cat]) {
         const row = document.createElement('div');
         row.className = 'list-item';
+        row.style.cursor = 'pointer';
         const amt = item.amount ? `${item.amount} ${item.unit || ''}`.trim() : (item.unit || '');
         row.innerHTML = `
+          <span style="font-size:1.2rem;color:var(--sage)">🛒</span>
           <div style="flex:1">
             <div style="font-weight:500">${item.name}</div>
             ${amt ? `<div style="font-size:0.8rem;color:var(--ink-muted)">${amt}</div>` : ''}
           </div>
           <button class="btn btn-sm btn-danger staple-del" data-id="${item.id}" title="Fjern">✕</button>`;
+
+        row.addEventListener('click', async () => {
+          try {
+            await api.addToList([item.id]);
+            toast(`${item.name} tilføjet`);
+          } catch (e) {
+            toast('Fejl: ' + e.message);
+          }
+        });
+
         listEl.appendChild(row);
       }
 

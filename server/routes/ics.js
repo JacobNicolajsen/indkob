@@ -121,9 +121,12 @@ router.get('/', async (req, res) => {
   if (!date) return res.status(400).json({ error: 'date er påkrævet' });
 
   const row = db.prepare("SELECT value FROM settings WHERE key = 'ics_url'").get();
-  const url = row?.value?.trim();
+  const rawUrl = row?.value?.trim();
 
-  if (!url) return res.json({ events: [] });
+  if (!rawUrl) return res.json({ events: [] });
+
+  // webcal:// er identisk med https:// — Node's fetch kender ikke skemaet
+  const url = rawUrl.replace(/^webcal:\/\//i, 'https://');
 
   // Hent og cache ICS-feed
   const now = Date.now();
