@@ -114,19 +114,41 @@ export function setTopActions(html) {
   document.getElementById('top-actions').innerHTML = html;
 }
 
-// ── PWA-kompatibel print (undgår window.open der blokeres i webapp-tilstand) ──
+// ── PWA-kompatibel print via hidden iframe ───────────────────────
+// Bruger iframe + srcdoc i stedet for window.open (blokeres i PWA)
+// eller @media print overlay (renderer for sent på iOS Safari).
 
-export function printHtml(html) {
-  let overlay = document.getElementById('print-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'print-overlay';
-    document.body.appendChild(overlay);
-  }
-  overlay.innerHTML = html;
+export function printHtml(bodyHtml) {
+  // Ryd evt. tidligere print-frame
+  document.getElementById('print-frame')?.remove();
 
-  window.addEventListener('afterprint', () => { overlay.innerHTML = ''; }, { once: true });
-  window.print();
+  const iframe = document.createElement('iframe');
+  iframe.id = 'print-frame';
+  // Skjult men i DOM — nødvendigt for at iOS Safari kan printe
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;pointer-events:none';
+
+  // Fuldt HTML-dokument i srcdoc (bodyHtml indeholder <style> + indhold)
+  iframe.srcdoc = `<!DOCTYPE html><html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body style="margin:0">${bodyHtml}</body>
+</html>`;
+
+  document.body.appendChild(iframe);
+
+  iframe.addEventListener('load', () => {
+    // Lille forsinkelse sikrer at mobilbrowseren når at rendere indholdet
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      // Ryd op efter print (afterprint understøttes ikke på alle mobile)
+      const cleanup = () => iframe.remove();
+      iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+      setTimeout(cleanup, 5000); // sikkerhedsfallback
+    }, 300);
+  });
 }
 
 // ── Init ─────────────────────────────────────────────────────────
