@@ -88,4 +88,66 @@ function recalculateShoppingList(db) {
   }
 }
 
-module.exports = { recalculateShoppingList };
+/**
+ * Tilføjer én rets ingredienser til indkøbslisten INKREMENTELT.
+ * Bruges når en ny ret tilføjes til en tom slot — ingen fuld genberegning.
+ * Aggregerer med eksisterende recipe-varer (samme navn + enhed summeres).
+ */
+function addMealToShoppingList(db, date, meal_type, recipe_id, servings) {
+  const recipe = db.prepare('SELECT servings FROM recipes WHERE id = ?').get(recipe_id);
+  if (!recipe) return;
+
+  const ratio = servings / (recipe.servings || 4);
+
+  const ingredients = db.prepare(`
+    SELECT p.name, p.shop_category, ri.amount, ri.unit
+    FROM recipe_ingredients ri
+    JOIN products p ON p.id = ri.product_id
+    WHERE ri.recipe_id = ?
+  `).all(recipe_id);
+
+  const recipeName = db.prepare('SELECT name FROM recipes WHERE id = ?').get(recipe_id)?.name || '';
+
+  db.exec('BEGIN');
+  try {
+    for (const ing of ingredients) {
+      const scaledAmount = ing.amount !== null
+        ? Math.round(ing.amount * ratio * 100) / 100
+        : null;
+
+      const key = ing.name.toLowerCase();
+      const existing = db.prepare(
+        "SELECT id, amount, sources FROM shopping_list WHERE LOWER(name) = ? AND unit = ? AND source = 'recipe'"
+      ).get(key, ing.unit);
+
+      const newSrc = { recipe_name: recipeName, date, meal_type };
+
+      if (existing) {
+        const newAmount = (existing.amount !== null && scaledAmount !== null)
+          ? Math.round(((existing.amount || 0) + scaledAmount) * 100) / 100
+          : (existing.amount ?? scaledAmount);
+
+        let srcs = [];
+        try { srcs = JSON.parse(existing.sources || '[]'); } catch { srcs = []; }
+        if (!srcs.some(s => s.date === date && s.meal_type === meal_type)) {
+          srcs.push(newSrc);
+        }
+
+        db.prepare(
+          "UPDATE shopping_list SET amount = ?, sources = ? WHERE id = ?"
+        ).run(newAmount, JSON.stringify(srcs), existing.id);
+      } else {
+        db.prepare(`
+          INSERT INTO shopping_list (name, amount, unit, shop_category, source, checked, sources)
+          VALUES (?, ?, ?, ?, 'recipe', 0, ?)
+        `).run(ing.name, scaledAmount, ing.unit, ing.shop_category, JSON.stringify([newSrc]));
+      }
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+module.exports = { recalculateShoppingList, addMealToShoppingList };

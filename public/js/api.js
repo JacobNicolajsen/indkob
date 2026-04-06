@@ -64,3 +64,29 @@ export const shoppinglist = {
 export const ai = {
   importRecipe: (url) => req('POST', '/ai/import-recipe', { url }),
 };
+
+// ── Dagnoter ─────────────────────────────────────────────────────
+export const notes = {
+  get:  (date)        => req('GET',  `/notes/${date}`),
+  save: (date, note)  => req('PUT',  `/notes/${date}`, { note }),
+};
+
+// ── Indstillinger ─────────────────────────────────────────────────
+export const settings = {
+  getAll: ()           => req('GET', '/settings'),
+  set:    (key, value) => req('PUT', `/settings/${key}`, { value }),
+};
+
+// ── ICS kalender ──────────────────────────────────────────────────
+export const ics = {
+  events:  (date) => req('GET', `/ics?date=${date}`),
+  refresh: ()     => req('POST', '/ics/refresh', {}),
+};
+
+// ── Basisvarer ────────────────────────────────────────────────────
+export const staples = {
+  list:      ()        => req('GET',    '/staples'),
+  add:       (data)    => req('POST',   '/staples', data),
+  delete:    (id)      => req('DELETE', `/staples/${id}`),
+  addToList: (ids)     => req('POST',   '/staples/add-to-list', { ids }),
+};

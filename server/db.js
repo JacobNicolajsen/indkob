@@ -11,7 +11,7 @@ db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
 // ─── Schema-version ───────────────────────────────────────────────
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 const version = db.prepare('PRAGMA user_version').get()['user_version'];
 const recipesExists = db.prepare(
   "SELECT name FROM sqlite_master WHERE type='table' AND name='recipes'"
@@ -152,10 +152,55 @@ if (version < 3) {
   try {
     db.exec(`ALTER TABLE shopping_list ADD COLUMN sources TEXT DEFAULT '[]'`);
   } catch (e) {
-    // Kolonnen eksisterer allerede — ignorer
     if (!e.message.includes('duplicate column')) throw e;
   }
   db.exec(`PRAGMA user_version = 3`);
+}
+
+// ── Migration v3 → v4: day_notes, settings, source_url, staple_items ──
+if (version < 4) {
+  db.exec('BEGIN');
+  try {
+    // Dagnoter per dato
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS day_notes (
+        date TEXT PRIMARY KEY,
+        note TEXT DEFAULT ''
+      );
+    `);
+
+    // App-indstillinger (nøgle/værdi)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT DEFAULT ''
+      );
+    `);
+
+    // Basisvarer
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS staple_items (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        name          TEXT    NOT NULL,
+        amount        REAL,
+        unit          TEXT    DEFAULT '',
+        shop_category TEXT    DEFAULT 'Andet'
+      );
+    `);
+
+    // source_url på opskrifter (link ved AI-import)
+    try {
+      db.exec(`ALTER TABLE recipes ADD COLUMN source_url TEXT DEFAULT ''`);
+    } catch (e) {
+      if (!e.message.includes('duplicate column')) throw e;
+    }
+
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  db.exec(`PRAGMA user_version = 4`);
 }
 
 module.exports = db;

@@ -1020,3 +1020,80 @@ html, body {
 .ai-new-prods strong { color: var(--ink); }
 
 .ai-error { color: var(--terra-deep); }
+
+
+/* =====================================================
+   PRINT OVERLAY (PWA-kompatibel print)
+   ===================================================== */
+
+#print-overlay {
+  display: none;
+}
+
+@media print {
+  body > #app,
+  body > #modal-root,
+  body > #modal-root2 {
+    display: none !important;
+  }
+
+  body > #print-overlay {
+    display: block !important;
+    position: static;
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   DAG-NOTER (madplan)
+   ===================================================== */
+
+.day-note-wrap {
+  padding: 4px 12px 8px;
+}
+
+.day-note-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.day-cal-events {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  font-style: italic;
+  padding: 3px 0 1px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.day-cal-event {
+  background: var(--amber-light);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-style: normal;
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.day-note-input {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--ink);
+  padding: 5px 2px;
+  resize: none;
+  outline: none;
+  min-height: 28px;
+  line-height: 1.4;
+}
+
+.day-note-input::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.7;
+}

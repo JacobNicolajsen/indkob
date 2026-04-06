@@ -3,15 +3,17 @@ import { renderRecipes }      from './views/recipes.js';
 import { renderShoppinglist } from './views/shoppinglist.js';
 import { renderCatalog }      from './views/catalog.js';
 import { renderMore }         from './views/more.js';
+import { renderStaples }      from './views/staples.js';
 
 export const state = { view: 'mealplan' };
 
-// Katalog er en sub-side under "Mere" — ingen egen nav-knap
+// Katalog og Basisvarer er sub-sider under "Mere" — ingen egne nav-knapper
 const views = {
   mealplan:     { title: 'Madplan',     render: renderMealplan,     navKey: 'mealplan' },
   recipes:      { title: 'Opskrifter',  render: renderRecipes,      navKey: 'recipes' },
   shoppinglist: { title: 'Indkøb',      render: renderShoppinglist, navKey: 'shoppinglist' },
   catalog:      { title: 'Varekatalog', render: renderCatalog,      navKey: 'more' },
+  staples:      { title: 'Basisvarer',  render: renderStaples,      navKey: 'more' },
   more:         { title: 'Mere',        render: renderMore,          navKey: 'more' },
 };
 
@@ -110,6 +112,21 @@ export function toast(msg, duration = 2500) {
 
 export function setTopActions(html) {
   document.getElementById('top-actions').innerHTML = html;
+}
+
+// ── PWA-kompatibel print (undgår window.open der blokeres i webapp-tilstand) ──
+
+export function printHtml(html) {
+  let overlay = document.getElementById('print-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'print-overlay';
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = html;
+
+  window.addEventListener('afterprint', () => { overlay.innerHTML = ''; }, { once: true });
+  window.print();
 }
 
 // ── Init ─────────────────────────────────────────────────────────

@@ -145,8 +145,8 @@ ${cleaned}`
   // ── 5. Opret opskriften ──────────────────────────────────────────
   try {
     const result = db.prepare(
-      'INSERT INTO recipes (name, description, servings, category, image) VALUES (?, ?, ?, ?, ?)'
-    ).run(name, desc, servings, category, image);
+      'INSERT INTO recipes (name, description, servings, category, image, source_url) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(name, desc, servings, category, image, url);
 
     const recipeId = result.lastInsertRowid;
 

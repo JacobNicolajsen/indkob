@@ -1,5 +1,10 @@
-import { mealplan, recipes as recipesApi } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
+import { mealplan, recipes as recipesApi, notes as notesApi, ics as icsApi } from '../api.js';
+import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
+
+function autoResizeTextarea(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
 
 // Brug altid lokal tid — toISOString() giver UTC og forskydes en dag i CEST
 function localDateStr(d) {
@@ -152,6 +157,43 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
 
   // ---- Aftensmad (altid synlig) ----
   card.appendChild(buildMealSlot(ds, DINNER, lookup[`${ds}|${DINNER.key}`], expandedDays, container));
+
+  // ---- Notelinje + ICS events ----
+  const noteWrap = document.createElement('div');
+  noteWrap.className = 'day-note-wrap';
+  noteWrap.innerHTML = `
+    <div class="day-note-row">
+      <div class="day-cal-events" id="cal-${ds}"></div>
+      <textarea class="day-note-input" id="note-${ds}" placeholder="Note til dagen…" rows="1"></textarea>
+    </div>`;
+  card.appendChild(noteWrap);
+
+  // Hent note og kalender-events asynkront (ikke-blokerende)
+  const noteEl = noteWrap.querySelector(`#note-${ds}`);
+  const calEl  = noteWrap.querySelector(`#cal-${ds}`);
+
+  notesApi.get(ds).then(r => {
+    noteEl.value = r.note || '';
+    autoResizeTextarea(noteEl);
+  }).catch(() => {});
+
+  icsApi.events(ds).then(r => {
+    if (r.events?.length) {
+      calEl.innerHTML = r.events.map(e =>
+        `<span class="day-cal-event">${e.time ? e.time + ' ' : ''}${e.summary}</span>`
+      ).join('');
+    }
+  }).catch(() => {});
+
+  // Auto-gem note ved ændring (debounced)
+  let noteTimeout;
+  noteEl.addEventListener('input', () => {
+    autoResizeTextarea(noteEl);
+    clearTimeout(noteTimeout);
+    noteTimeout = setTimeout(() => {
+      notesApi.save(ds, noteEl.value).catch(() => {});
+    }, 800);
+  });
 
   // ---- Toggle via + knap i headeren ----
   header.querySelector('.day-expand-btn').addEventListener('click', (e) => {
@@ -369,11 +411,11 @@ function execMealplanPrint(from, to, entries) {
   const fromLbl = new Date(from+'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'long'});
   const toLbl   = new Date(to  +'T00:00:00').toLocaleDateString('da-DK',{day:'numeric',month:'long'});
 
-  const html = `<!DOCTYPE html><html lang="da"><head><meta charset="UTF-8">
-<title>Madplan</title>
+  const html = `
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,Arial,sans-serif;color:#111;padding:28px 36px;max-width:680px;margin:0 auto}
+body,#print-overlay{font-family:-apple-system,Arial,sans-serif;color:#111}
+.pr-wrap{max-width:680px;margin:0 auto;padding:28px 36px}
 h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
 .sub{font-size:.9rem;color:#777;margin-bottom:24px}
 .day{margin-bottom:14px;border:1px solid #ddd;border-radius:8px;overflow:hidden}
@@ -385,18 +427,14 @@ h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
 .ms{font-size:.8rem;color:#999;flex-shrink:0}
 .empty{padding:9px 14px;color:#bbb;font-size:.85rem;font-style:italic;border-top:1px solid #f0f0f0}
 .foot{margin-top:20px;font-size:.72rem;color:#bbb}
-@media print{body{padding:8px}}
-</style></head><body>
+</style>
+<div class="pr-wrap">
 <h1>📅 Madplan</h1>
 <p class="sub">${fromLbl} – ${toLbl}</p>
 ${daysHtml}
 <p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK')}</p>
-</body></html>`;
+</div>`;
 
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 400);
+  printHtml(html);
 }
 

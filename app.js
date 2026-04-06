@@ -21,6 +21,10 @@ app.use('/api/recipes',      require('./server/routes/recipes'));
 app.use('/api/mealplan',     require('./server/routes/mealplan'));
 app.use('/api/shoppinglist', require('./server/routes/shoppinglist'));
 app.use('/api/ai',           require('./server/routes/ai'));
+app.use('/api/notes',        require('./server/routes/notes'));
+app.use('/api/settings',     require('./server/routes/settings'));
+app.use('/api/ics',          require('./server/routes/ics'));
+app.use('/api/staples',      require('./server/routes/staples'));
 
 app.get('*', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html'))

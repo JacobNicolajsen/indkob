@@ -115,6 +115,11 @@ async function openRecipeDetail(id, container) {
       <span class="badge badge-terra">${recipe.category || 'Ingen kategori'}</span>
       <span class="badge badge-sage">👥 ${recipe.servings} pers.</span>
     </div>
+    ${recipe.source_url ? `
+      <a href="${recipe.source_url}" target="_blank" rel="noopener"
+         style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--terra);text-decoration:none;margin-bottom:14px;word-break:break-all">
+        🔗 Originalopskrift
+      </a>` : ''}
     <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600;margin-bottom:8px">Ingredienser</div>
     <div id="ing-list" style="margin-bottom:20px"></div>
     <div style="display:flex;gap:10px;padding-bottom:8px">

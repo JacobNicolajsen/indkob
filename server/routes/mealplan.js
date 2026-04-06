@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
-const { recalculateShoppingList } = require('../shoppingHelper');
+const { recalculateShoppingList, addMealToShoppingList } = require('../shoppingHelper');
 
 // GET /api/mealplan?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/', (req, res) => {
@@ -38,6 +38,10 @@ router.post('/', (req, res) => {
     return res.status(404).json({ error: 'Opskrift ikke fundet' });
   }
 
+  // Er slotten tom? → inkrementel tilføjelse. Ellers (replace/portioner) → fuld genberegning.
+  const existing = db.prepare('SELECT recipe_id, servings FROM meal_plan WHERE date = ? AND meal_type = ?').get(date, meal_type);
+  const isNewSlot = !existing;
+
   db.prepare(`
     INSERT INTO meal_plan (date, meal_type, recipe_id, servings)
     VALUES (?, ?, ?, ?)
@@ -46,7 +50,13 @@ router.post('/', (req, res) => {
   `).run(date, meal_type, recipe_id, servings);
 
   // ── Auto-opdater indkøbsliste ──────────────────────────────────
-  try { recalculateShoppingList(db); } catch (e) { console.warn('Shopping recalc:', e.message); }
+  try {
+    if (isNewSlot) {
+      addMealToShoppingList(db, date, meal_type, recipe_id, servings);
+    } else {
+      recalculateShoppingList(db);
+    }
+  } catch (e) { console.warn('Shopping update:', e.message); }
 
   res.json({ ok: true });
 });

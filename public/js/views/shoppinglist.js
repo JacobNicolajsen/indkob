@@ -1,5 +1,5 @@
-import { shoppinglist as api } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
+import { shoppinglist as api, products as productsApi } from '../api.js';
+import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
 import { UNITS } from '../constants.js';
 
 const SHOP_CATEGORIES = [
@@ -186,21 +186,23 @@ function openAddItemSheet(container) {
 
   openSheet('Tilføj vare', frag);
 
-  // Auto-komplet fra bibliotek
-  let library = [];
-  api.library.list().then(lib => { library = lib; }).catch(() => {});
-
+  // Auto-komplet fra produktkatalog
   let suggestTimeout;
   frag.querySelector('#item-name').addEventListener('input', e => {
     clearTimeout(suggestTimeout);
-    suggestTimeout = setTimeout(() => {
-      const q = e.target.value.toLowerCase();
-      const sugg = frag.querySelector('#item-suggestions');
-      if (!q || library.length === 0) { sugg.innerHTML = ''; return; }
-      const matches = library.filter(i => i.name.toLowerCase().includes(q)).slice(0, 5);
+    const q = e.target.value.trim();
+    const sugg = frag.querySelector('#item-suggestions');
+    if (!q) { sugg.innerHTML = ''; return; }
+
+    suggestTimeout = setTimeout(async () => {
+      let matches = [];
+      try { matches = await productsApi.list({ search: q }); } catch { return; }
+      matches = matches.slice(0, 6);
       sugg.innerHTML = matches.map(m =>
-        `<div class="list-item" style="border-radius:8px;padding:10px 12px;font-size:0.9rem" data-id="${m.id}" data-name="${m.name}" data-unit="${m.unit}" data-cat="${m.shop_category}">
-          ${CAT_ICONS[m.shop_category] || '📦'} ${m.name} <span style="color:var(--ink-muted);font-size:0.8rem">${m.unit}</span>
+        `<div class="list-item" style="border-radius:8px;padding:10px 12px;font-size:0.9rem"
+              data-name="${m.name}" data-unit="${m.default_unit}" data-cat="${m.shop_category}">
+          ${CAT_ICONS[m.shop_category] || '📦'} ${m.name}
+          <span style="color:var(--ink-muted);font-size:0.8rem">${m.default_unit}</span>
         </div>`
       ).join('');
 
@@ -213,7 +215,7 @@ function openAddItemSheet(container) {
           sugg.innerHTML = '';
         });
       });
-    }, 200);
+    }, 250);
   });
 
   frag.querySelector('#btn-add-item').addEventListener('click', async () => {
@@ -327,11 +329,11 @@ function printShoppingList() {
   const unchecked = items.filter(i => !i.checked).length;
   const dateStr   = new Date().toLocaleDateString('da-DK', { weekday:'long', day:'numeric', month:'long' });
 
-  const html = `<!DOCTYPE html><html lang="da"><head><meta charset="UTF-8">
-<title>Indkøbsliste</title>
+  const html = `
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,Helvetica,sans-serif;color:#111;padding:20px 24px;max-width:900px;margin:0 auto;font-size:13px}
+body,#print-overlay{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:13px}
+.pr-wrap{max-width:900px;margin:0 auto;padding:20px 24px}
 h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
 .sub{font-size:.85rem;color:#555;margin-bottom:16px}
 .cols{column-count:2;column-gap:32px}
@@ -343,23 +345,15 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
 .am{font-size:.88rem;color:#444;font-weight:600;text-align:right;flex-shrink:0;white-space:nowrap}
 .done .nm{text-decoration:line-through;opacity:.35}
 .foot{margin-top:20px;font-size:.7rem;color:#aaa;border-top:1px solid #eee;padding-top:8px}
-@media print{
-  body{padding:6px 10px;font-size:12px}
-  h1{font-size:1.2rem}
-  .cols{column-count:2}
-}
-</style></head><body>
+</style>
+<div class="pr-wrap">
 <h1>🛒 Indkøbsliste</h1>
 <p class="sub">${unchecked} af ${items.length} varer mangler · ${dateStr}</p>
 <div class="cols">${groupsHtml}</div>
 <p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
-</body></html>`;
+</div>`;
 
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 300);
+  printHtml(html);
 }
 
 async function openLibrarySheet(container) {
