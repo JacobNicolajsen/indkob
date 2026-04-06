@@ -360,7 +360,7 @@ function openMealplanPrintSheet(monday, sunday) {
 
     try {
       const entries = await mealplan.list(from, to);
-      execMealplanPrint(from, to, entries);
+      await execMealplanPrint(from, to, entries);
       closeSheet();
     } catch (e) {
       toast('Fejl: ' + e.message);
@@ -370,7 +370,7 @@ function openMealplanPrintSheet(monday, sunday) {
   });
 }
 
-function execMealplanPrint(from, to, entries) {
+async function execMealplanPrint(from, to, entries) {
   const lookup = {};
   for (const e of entries) {
     if (!lookup[e.date]) lookup[e.date] = {};
@@ -381,6 +381,19 @@ function execMealplanPrint(from, to, entries) {
   const cur  = new Date(from + 'T00:00:00');
   const end  = new Date(to   + 'T00:00:00');
   while (cur <= end) { days.push(localDateStr(cur)); cur.setDate(cur.getDate() + 1); }
+
+  // Hent noter og kalenderevents for alle dage parallelt
+  const [notesResults, icsResults] = await Promise.all([
+    Promise.all(days.map(ds => notesApi.get(ds).catch(() => ({ note: '' })))),
+    Promise.all(days.map(ds => icsApi.events(ds).catch(() => ({ events: [] })))),
+  ]);
+
+  const notesByDate = {};
+  const icsByDate   = {};
+  days.forEach((ds, i) => {
+    notesByDate[ds] = notesResults[i]?.note || '';
+    icsByDate[ds]   = icsResults[i]?.events  || [];
+  });
 
   const DAY_FULL   = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
   const MEAL_LABEL = { breakfast:'Morgenmad', lunch:'Frokost', dinner:'Aftensmad' };
@@ -402,9 +415,26 @@ function execMealplanPrint(from, to, entries) {
       </div>`;
     }).join('');
 
+    const calEvents = icsByDate[ds];
+    const calHtml = calEvents.length
+      ? `<div class="cal-row">${calEvents.map(ev =>
+          `<span class="cal-chip">${ev.time ? ev.time + ' ' : ''}${ev.summary}</span>`
+        ).join('')}</div>`
+      : '';
+
+    const note = notesByDate[ds];
+    const noteHtml = note
+      ? `<div class="note-row">${note.replace(/\n/g, '<br>')}</div>`
+      : '';
+
+    const extra = calHtml || noteHtml
+      ? `<div class="day-extra">${calHtml}${noteHtml}</div>`
+      : '';
+
     return `<div class="day">
       <div class="dh">${dayName} <span class="dl">${dateLbl}</span></div>
       ${mealsHtml || '<div class="empty">Ingen retter</div>'}
+      ${extra}
     </div>`;
   }).join('');
 
@@ -426,6 +456,10 @@ h1{font-size:1.5rem;font-weight:700;margin-bottom:2px}
 .mn{flex:1;font-size:.93rem}
 .ms{font-size:.8rem;color:#999;flex-shrink:0}
 .empty{padding:9px 14px;color:#bbb;font-size:.85rem;font-style:italic;border-top:1px solid #f0f0f0}
+.day-extra{padding:7px 14px;border-top:1px solid #f0f0f0;background:#fafafa}
+.cal-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+.cal-chip{font-size:.74rem;background:#FDF3DC;color:#555;border-radius:4px;padding:2px 7px;font-weight:500}
+.note-row{font-size:.82rem;color:#555;font-style:italic;line-height:1.4}
 .foot{margin-top:20px;font-size:.72rem;color:#bbb}
 </style>
 <div class="pr-wrap">
