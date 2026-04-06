@@ -1022,7 +1022,27 @@ html, body {
 .ai-error { color: var(--terra-deep); }
 
 
-/* Print sker via hidden iframe — ingen @media print regler nødvendige her */
+/* =====================================================
+   PRINT OVERLAY (PWA-kompatibel print)
+   ===================================================== */
+
+#print-overlay {
+  display: none;
+}
+
+@media print {
+  body > #app,
+  body > #modal-root,
+  body > #modal-root2 {
+    display: none !important;
+  }
+
+  body > #print-overlay {
+    display: block !important;
+    position: static;
+    width: 100%;
+  }
+}
 
 /* =====================================================
    DAG-NOTER (madplan)
