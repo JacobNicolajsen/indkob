@@ -7,13 +7,13 @@ import { renderStaples }      from './views/staples.js';
 
 export const state = { view: 'mealplan' };
 
-// Katalog og Basisvarer er sub-sider under "Mere" — ingen egne nav-knapper
+// Katalog er sub-side under "Mere" — ingen egen nav-knap
 const views = {
   mealplan:     { title: 'Madplan',     render: renderMealplan,     navKey: 'mealplan' },
   recipes:      { title: 'Opskrifter',  render: renderRecipes,      navKey: 'recipes' },
+  staples:      { title: 'Basisvarer',  render: renderStaples,      navKey: 'staples' },
   shoppinglist: { title: 'Indkøb',      render: renderShoppinglist, navKey: 'shoppinglist' },
   catalog:      { title: 'Varekatalog', render: renderCatalog,      navKey: 'more' },
-  staples:      { title: 'Basisvarer',  render: renderStaples,      navKey: 'more' },
   more:         { title: 'Mere',        render: renderMore,          navKey: 'more' },
 };
 

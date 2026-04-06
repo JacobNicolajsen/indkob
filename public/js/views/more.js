@@ -22,14 +22,6 @@ export async function renderMore(container) {
         </div>
         <span style="color:var(--ink-muted);font-size:1.1rem">›</span>
       </div>
-      <div class="list-item" id="go-staples">
-        <span style="font-size:1.4rem;width:28px;text-align:center">🧺</span>
-        <div style="flex:1">
-          <div style="font-weight:600">Basisvarer</div>
-          <div style="font-size:0.78rem;color:var(--ink-muted)">Faste varer der tilføjes med ét tryk</div>
-        </div>
-        <span style="color:var(--ink-muted);font-size:1.1rem">›</span>
-      </div>
     </div>
 
     <div class="section-header">Kalenderabonnement</div>
@@ -76,10 +68,6 @@ export async function renderMore(container) {
 
   container.querySelector('#go-catalog').addEventListener('click', () => {
     navigate('catalog', { backTo: 'more' });
-  });
-
-  container.querySelector('#go-staples').addEventListener('click', () => {
-    navigate('staples', { backTo: 'more' });
   });
 
   container.querySelector('#btn-ics-save').addEventListener('click', async () => {
