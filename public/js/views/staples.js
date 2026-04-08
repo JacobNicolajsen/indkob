@@ -22,7 +22,7 @@ export async function renderStaples(container) {
 
   function updateTopActions() {
     setTopActions(`
-      <button class="top-action${editMode ? ' top-action--active' : ''}" id="btn-edit-staples" title="Rediger">Rediger</button>
+      <button class="top-action${editMode ? ' top-action--active' : ''}" id="btn-edit-staples" title="Rediger">✏️</button>
       <button class="top-action" id="btn-add-staple" title="Tilføj basisvare">＋</button>
     `);
     document.getElementById('btn-edit-staples')?.addEventListener('click', () => {

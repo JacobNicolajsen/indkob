@@ -309,7 +309,9 @@ function printShoppingList() {
     groups[cat].push(item);
   }
 
-  const groupsHtml = SHOP_CATEGORIES.filter(c => groups[c]).map(cat => {
+  const activeCats = SHOP_CATEGORIES.filter(c => groups[c]);
+
+  const makeCatHtml = cat => {
     const rowsHtml = groups[cat].map(item => {
       const amt = item.amount
         ? `${item.amount} ${item.unit || ''}`.trim()
@@ -324,7 +326,12 @@ function printShoppingList() {
       <div class="ch">${CAT_ICONS[cat] || '📦'} ${cat}</div>
       ${rowsHtml}
     </div>`;
-  }).join('');
+  };
+
+  // Split manuelt i to kolonner så iOS print-renderer respekterer layoutet
+  const mid = Math.ceil(activeCats.length / 2);
+  const leftHtml  = activeCats.slice(0, mid).map(makeCatHtml).join('');
+  const rightHtml = activeCats.slice(mid).map(makeCatHtml).join('');
 
   const unchecked = items.filter(i => !i.checked).length;
   const dateStr   = new Date().toLocaleDateString('da-DK', { weekday:'long', day:'numeric', month:'long' });
@@ -336,7 +343,7 @@ body,#print-overlay{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:
 .pr-wrap{max-width:900px;margin:0 auto;padding:20px 24px}
 h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
 .sub{font-size:.85rem;color:#555;margin-bottom:16px}
-.cols{column-count:2;column-gap:32px}
+.cols{display:table;width:100%;table-layout:fixed}.col{display:table-cell;width:50%;vertical-align:top;padding-right:20px}.col+.col{padding-right:0;padding-left:12px}
 .cat{margin-bottom:16px;break-inside:avoid}
 .ch{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:5px;padding-bottom:4px;border-bottom:2px solid #ccc}
 .item{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid #eee}
@@ -349,7 +356,7 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
 <div class="pr-wrap">
 <h1>🛒 Indkøbsliste</h1>
 <p class="sub">${unchecked} af ${items.length} varer mangler · ${dateStr}</p>
-<div class="cols">${groupsHtml}</div>
+<div class="cols"><div class="col">${leftHtml}</div><div class="col">${rightHtml}</div></div>
 <p class="foot">Udskrevet ${new Date().toLocaleDateString('da-DK', {weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
 </div>`;
 
