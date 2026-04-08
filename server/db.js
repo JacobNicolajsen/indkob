@@ -11,7 +11,7 @@ db.exec('PRAGMA journal_mode = WAL');
 db.exec('PRAGMA foreign_keys = ON');
 
 // ─── Schema-version ───────────────────────────────────────────────
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 const version = db.prepare('PRAGMA user_version').get()['user_version'];
 const recipesExists = db.prepare(
   "SELECT name FROM sqlite_master WHERE type='table' AND name='recipes'"
@@ -201,6 +201,30 @@ if (version < 4) {
     throw e;
   }
   db.exec(`PRAGMA user_version = 4`);
+}
+
+// ── Migration v4 → v5: lokale kalenderbegivenheder ────────────────
+if (version < 5) {
+  db.exec('BEGIN');
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cal_events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        title      TEXT    NOT NULL,
+        date       TEXT    NOT NULL,
+        start_time TEXT    DEFAULT NULL,
+        end_time   TEXT    DEFAULT NULL,
+        all_day    INTEGER DEFAULT 1,
+        notes      TEXT    DEFAULT '',
+        created_at TEXT    DEFAULT (datetime('now'))
+      );
+    `);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  db.exec(`PRAGMA user_version = 5`);
 }
 
 module.exports = db;

@@ -97,6 +97,7 @@ html, body {
   transition: opacity 0.15s;
 }
 #top-bar .top-action:active { opacity: 0.6; }
+#top-bar .top-action--active { opacity: 1; font-weight: 600; }
 
 #view-container {
   flex: 1;
@@ -688,7 +689,7 @@ html, body {
 
 .recipe-card-name {
   font-family: var(--serif);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.25;
   margin-bottom: 2px;
@@ -700,7 +701,7 @@ html, body {
 }
 
 .recipe-card-meta {
-  font-size: 0.65rem;
+  font-size: 0.73rem;
   color: var(--ink-muted);
   font-weight: 500;
 }

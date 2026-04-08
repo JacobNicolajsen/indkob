@@ -13,13 +13,27 @@ const CAT_ICONS = {
 };
 
 let items = [];
+let editMode = false;
 
 export async function renderStaples(container) {
   container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-muted)">Henter basisvarer…</div>';
 
-  setTopActions(`
-    <button class="top-action" id="btn-add-staple" title="Tilføj basisvare">＋</button>
-  `);
+  editMode = false;
+
+  function updateTopActions() {
+    setTopActions(`
+      <button class="top-action${editMode ? ' top-action--active' : ''}" id="btn-edit-staples" title="Rediger">Rediger</button>
+      <button class="top-action" id="btn-add-staple" title="Tilføj basisvare">＋</button>
+    `);
+    document.getElementById('btn-edit-staples')?.addEventListener('click', () => {
+      editMode = !editMode;
+      updateTopActions();
+      renderList(container);
+    });
+    document.getElementById('btn-add-staple')?.addEventListener('click', () => {
+      openAddSheet(container);
+    });
+  }
 
   try {
     items = await api.list();
@@ -28,24 +42,12 @@ export async function renderStaples(container) {
     return;
   }
 
+  updateTopActions();
   renderList(container);
-
-  document.getElementById('btn-add-staple')?.addEventListener('click', () => {
-    openAddSheet(container);
-  });
 }
 
 function renderList(container) {
   container.innerHTML = '';
-
-  // "Tilføj alle til indkøbsliste" knap
-  const addAllBtn = document.createElement('div');
-  addAllBtn.style.cssText = 'padding:16px 16px 8px';
-  addAllBtn.innerHTML = `
-    <button class="btn btn-primary btn-full" id="btn-add-all" ${items.length === 0 ? 'disabled' : ''}>
-      🛒 Tilføj alle til indkøbslisten
-    </button>`;
-  container.appendChild(addAllBtn);
 
   if (items.length === 0) {
     const empty = document.createElement('div');
@@ -83,7 +85,8 @@ function renderList(container) {
             <div style="font-weight:500">${item.name}</div>
             ${amt ? `<div style="font-size:0.8rem;color:var(--ink-muted)">${amt}</div>` : ''}
           </div>
-          <button class="btn btn-sm btn-danger staple-del" data-id="${item.id}" title="Fjern">✕</button>`;
+          <button class="btn btn-sm btn-danger staple-del" data-id="${item.id}" title="Fjern"
+            style="display:${editMode ? 'inline-flex' : 'none'}">✕</button>`;
 
         row.addEventListener('click', async () => {
           try {
@@ -105,15 +108,6 @@ function renderList(container) {
   const spacer = document.createElement('div');
   spacer.style.height = '80px';
   container.appendChild(spacer);
-
-  container.querySelector('#btn-add-all')?.addEventListener('click', async () => {
-    try {
-      const r = await api.addToList();
-      toast(`${r.added} varer tilføjet til indkøbslisten`);
-    } catch (e) {
-      toast('Fejl: ' + e.message);
-    }
-  });
 
   container.querySelectorAll('.staple-del').forEach(btn => {
     btn.addEventListener('click', async (e) => {

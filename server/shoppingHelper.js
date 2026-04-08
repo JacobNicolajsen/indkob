@@ -150,4 +150,58 @@ function addMealToShoppingList(db, date, meal_type, recipe_id, servings) {
   }
 }
 
-module.exports = { recalculateShoppingList, addMealToShoppingList };
+/**
+ * Fjerner én rets ingrediens-bidrag fra indkøbslisten INKREMENTELT.
+ * recipe_id og servings er den rets GAMLE værdier (dem der fjernes).
+ */
+function removeMealFromShoppingList(db, date, meal_type, recipe_id, servings) {
+  const recipe = db.prepare('SELECT servings FROM recipes WHERE id = ?').get(recipe_id);
+  if (!recipe) return;
+
+  const ratio = servings / (recipe.servings || 4);
+
+  const ingredients = db.prepare(`
+    SELECT p.name, ri.amount, ri.unit
+    FROM recipe_ingredients ri
+    JOIN products p ON p.id = ri.product_id
+    WHERE ri.recipe_id = ?
+  `).all(recipe_id);
+
+  db.exec('BEGIN');
+  try {
+    for (const ing of ingredients) {
+      const scaledAmount = ing.amount !== null
+        ? Math.round(ing.amount * ratio * 100) / 100
+        : null;
+
+      const existing = db.prepare(
+        "SELECT id, amount, sources FROM shopping_list WHERE LOWER(name) = ? AND unit = ? AND source = 'recipe'"
+      ).get(ing.name.toLowerCase(), ing.unit);
+
+      if (!existing) continue;
+
+      // Fjern denne kilde fra sources-array
+      let srcs = [];
+      try { srcs = JSON.parse(existing.sources || '[]'); } catch { srcs = []; }
+      srcs = srcs.filter(s => !(s.date === date && s.meal_type === meal_type));
+
+      if (srcs.length === 0) {
+        // Ingen kilder tilbage → slet rækken
+        db.prepare("DELETE FROM shopping_list WHERE id = ?").run(existing.id);
+      } else {
+        // Træk mængden fra
+        const newAmount = (existing.amount !== null && scaledAmount !== null)
+          ? Math.max(0, Math.round(((existing.amount || 0) - scaledAmount) * 100) / 100)
+          : existing.amount;
+        db.prepare("UPDATE shopping_list SET amount = ?, sources = ? WHERE id = ?")
+          .run(newAmount, JSON.stringify(srcs), existing.id);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+module.exports = { recalculateShoppingList, addMealToShoppingList, removeMealFromShoppingList };

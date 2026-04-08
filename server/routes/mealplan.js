@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
-const { recalculateShoppingList, addMealToShoppingList } = require('../shoppingHelper');
+const { recalculateShoppingList, addMealToShoppingList, removeMealFromShoppingList } = require('../shoppingHelper');
 
 // GET /api/mealplan?from=YYYY-MM-DD&to=YYYY-MM-DD
 router.get('/', (req, res) => {
@@ -38,9 +38,8 @@ router.post('/', (req, res) => {
     return res.status(404).json({ error: 'Opskrift ikke fundet' });
   }
 
-  // Er slotten tom? → inkrementel tilføjelse. Ellers (replace/portioner) → fuld genberegning.
+  // Gem eksisterende slot INDEN upsert (bruges til at fjerne gammelt bidrag præcist)
   const existing = db.prepare('SELECT recipe_id, servings FROM meal_plan WHERE date = ? AND meal_type = ?').get(date, meal_type);
-  const isNewSlot = !existing;
 
   db.prepare(`
     INSERT INTO meal_plan (date, meal_type, recipe_id, servings)
@@ -49,13 +48,17 @@ router.post('/', (req, res) => {
     DO UPDATE SET recipe_id = excluded.recipe_id, servings = excluded.servings
   `).run(date, meal_type, recipe_id, servings);
 
-  // ── Auto-opdater indkøbsliste ──────────────────────────────────
+  // ── Auto-opdater indkøbsliste (inkrementelt — ingen fuld genberegning) ──
   try {
-    if (isNewSlot) {
+    if (!existing) {
+      // Ny slot — tilføj ingredienser
       addMealToShoppingList(db, date, meal_type, recipe_id, servings);
-    } else {
-      recalculateShoppingList(db);
+    } else if (existing.recipe_id !== recipe_id || existing.servings !== servings) {
+      // Ret eller portioner ændret — fjern gammelt bidrag, tilføj nyt
+      removeMealFromShoppingList(db, date, meal_type, existing.recipe_id, existing.servings);
+      addMealToShoppingList(db, date, meal_type, recipe_id, servings);
     }
+    // Samme ret + samme portioner → ingen ændring i indkøbslisten
   } catch (e) { console.warn('Shopping update:', e.message); }
 
   res.json({ ok: true });
@@ -63,16 +66,25 @@ router.post('/', (req, res) => {
 
 // DELETE /api/mealplan/:id
 router.delete('/:id', (req, res) => {
+  const mp = db.prepare('SELECT date, meal_type, recipe_id, servings FROM meal_plan WHERE id = ?').get(req.params.id);
   db.prepare('DELETE FROM meal_plan WHERE id = ?').run(req.params.id);
-  try { recalculateShoppingList(db); } catch (e) { console.warn('Shopping recalc:', e.message); }
+  if (mp) {
+    try { removeMealFromShoppingList(db, mp.date, mp.meal_type, mp.recipe_id, mp.servings); }
+    catch (e) { console.warn('Shopping remove:', e.message); }
+  }
   res.json({ ok: true });
 });
 
 // DELETE /api/mealplan/slot/:date/:meal_type
 router.delete('/slot/:date/:meal_type', (req, res) => {
+  const mp = db.prepare('SELECT recipe_id, servings FROM meal_plan WHERE date = ? AND meal_type = ?')
+    .get(req.params.date, req.params.meal_type);
   db.prepare('DELETE FROM meal_plan WHERE date = ? AND meal_type = ?')
     .run(req.params.date, req.params.meal_type);
-  try { recalculateShoppingList(db); } catch (e) { console.warn('Shopping recalc:', e.message); }
+  if (mp) {
+    try { removeMealFromShoppingList(db, req.params.date, req.params.meal_type, mp.recipe_id, mp.servings); }
+    catch (e) { console.warn('Shopping remove:', e.message); }
+  }
   res.json({ ok: true });
 });
 
