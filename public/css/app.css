@@ -30,6 +30,9 @@
   :root {
     --safe-bottom: 0px;
   }
+  #bottom-nav {
+    padding-bottom: 0 !important;
+  }
 }
 
 * {
@@ -434,6 +437,12 @@ html, body {
   background: var(--amber-light);
 }
 
+.day-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .day-name {
   font-family: var(--serif);
   font-size: 1.15rem;
@@ -447,15 +456,16 @@ html, body {
 }
 
 .date-chip {
-  font-size: 0.72rem;
-  font-weight: 500;
+  font-size: 1.15rem;
+  font-family: var(--serif);
+  font-weight: 400;
   color: var(--ink-muted);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
 }
 
 .day-header.is-today .date-chip {
-  color: var(--amber);
-  font-weight: 600;
+  color: var(--terra);
+  font-weight: 500;
 }
 
 /* Meal slot */

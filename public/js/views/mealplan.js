@@ -140,8 +140,10 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
   const header = document.createElement('div');
   header.className = `day-header${isToday ? ' is-today' : ''}`;
   header.innerHTML = `
-    <span class="day-name">${DAY_NAMES[dayIndex]}</span>
-    <span class="date-chip">${isToday ? 'I dag · ' : ''}${formatDate(dateObj)}</span>
+    <div class="day-header-left">
+      <span class="day-name">${DAY_NAMES[dayIndex]}</span>
+      <span class="date-chip">${isToday ? 'I dag · ' : ''}${formatDate(dateObj)}</span>
+    </div>
     <button class="day-expand-btn${isExpanded ? ' open' : ''}" title="Morgenmad & frokost">+</button>
   `;
   card.appendChild(header);
