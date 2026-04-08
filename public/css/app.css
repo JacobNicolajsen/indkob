@@ -28,7 +28,7 @@
    Vi reducerer med 10px så det matcher det visuelle udtryk i Safari. */
 @media (display-mode: standalone) {
   :root {
-    --safe-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 0px);
+    --safe-bottom: 0px;
   }
 }
 
