@@ -23,6 +23,15 @@
   --sans:         'DM Sans', -apple-system, sans-serif;
 }
 
+/* I PWA/standalone-mode er safe-area-inset-bottom ~34px (hjemme-indikatoren),
+   mens Safari returnerer 0 fordi browser-toolbar dækker zonen.
+   Vi reducerer med 10px så det matcher det visuelle udtryk i Safari. */
+@media (display-mode: standalone) {
+  :root {
+    --safe-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 0px);
+  }
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
