@@ -437,12 +437,6 @@ html, body {
   background: var(--amber-light);
 }
 
-.day-header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
 .day-name {
   font-family: var(--serif);
   font-size: 1.15rem;
