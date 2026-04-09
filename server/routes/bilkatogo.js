@@ -20,18 +20,38 @@ function setSetting(key, value) {
   ).run(key, String(value));
 }
 
-// ── Gigya login → session token ───────────────────────────────────
+// ── Gigya login → JWT ─────────────────────────────────────────────
 async function gigyaLogin(email, password) {
-  const res = await fetch(`${GIGYA_BASE}/accounts.login`, {
+  // Trin 1: login → sessionToken + sessionSecret
+  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }).toString()
   });
-  const data = await res.json();
-  if (data.errorCode !== 0) throw new Error(`Gigya: ${data.errorMessage || data.errorCode}`);
-  const token = data.sessionInfo?.sessionToken;
-  if (!token) throw new Error('Gigya returnerede intet session-token');
-  return token;
+  const loginData = await loginRes.json();
+  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
+
+  const sessionToken  = loginData.sessionInfo?.sessionToken;
+  const sessionSecret = loginData.sessionInfo?.sessionSecret;
+  if (!sessionToken) throw new Error(`Gigya returnerede intet session-token (keys: ${Object.keys(loginData).join(',')})`);
+
+  // Trin 2: hent JWT via getJWT
+  const jwtRes = await fetch(`${GIGYA_BASE}/accounts.getJWT`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      apiKey:      GIGYA_KEY,
+      oauth_token: sessionToken,
+      secret:      sessionSecret || '',
+      format:      'json',
+      fields:      'profile.email,profile.firstName',
+    }).toString()
+  });
+  const jwtData = await jwtRes.json();
+  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT: ${jwtData.errorMessage || jwtData.errorCode}`);
+  const jwt = jwtData.id_token;
+  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
+  return jwt;
 }
 
 // ── Bilka JWT-login → session cookie ─────────────────────────────
