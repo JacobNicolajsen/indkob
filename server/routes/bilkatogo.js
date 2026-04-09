@@ -55,9 +55,11 @@ async function gigyaLogin(email, password) {
   const cookieValue = si.sessionToken || si.cookieValue;
   if (!cookieValue) throw new Error(`Gigya: intet token (sessionInfo keys: ${Object.keys(si).join(',')})`);
 
-  // Trin 2: accounts.getJWT med browser-kontekst (Origin + Referer + session cookie)
-  const jwtUrl = `${GIGYA_BASE}/accounts.getJWT`;
-  const jwtRes = await fetch(jwtUrl, {
+  // Trin 2: accounts.getJWT via EU1 FIDM-endpoint (producerer korrekt iss: fidm.eu1.gigya.com)
+  // accounts.eu1.gigya.com/accounts.getJWT returnerer 403007 server-side,
+  // men fidm.eu1.gigya.com er JWT-specifikt og har andre adgangskrav.
+  const fidmUrl = 'https://fidm.eu1.gigya.com/accounts.getJWT';
+  const jwtRes  = await fetch(fidmUrl, {
     method:  'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -67,14 +69,15 @@ async function gigyaLogin(email, password) {
       'User-Agent':   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
     },
     body: new URLSearchParams({
-      apiKey: GIGYA_KEY, format: 'json', fields: 'profile.email',
+      apiKey: GIGYA_KEY, format: 'json',
+      fields: 'profile.email,profile.firstName',
       sdk: 'js_latest', targetEnv: 'jssdk',
     }).toString()
   });
   const jwtData = await jwtRes.json();
-  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
+  if (jwtData.errorCode !== 0) throw new Error(`Gigya FIDM getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
   const jwt = jwtData.id_token;
-  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
+  if (!jwt) throw new Error('Gigya FIDM getJWT returnerede intet id_token');
   return jwt;
 }
 
