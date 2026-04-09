@@ -80,6 +80,8 @@ async function gigyaLogin(email, password) {
 
 // ── Bilka JWT-login → session cookie ─────────────────────────────
 async function bilkaLogin(gigyaToken) {
+  console.log('[bilka] token type:', typeof gigyaToken, '| length:', gigyaToken?.length, '| prefix:', gigyaToken?.slice(0, 30));
+
   const res = await fetch(`${BILKA_BASE}/api/auth/LoginJWT?u=w`, {
     method: 'POST',
     headers: {
@@ -93,7 +95,7 @@ async function bilkaLogin(gigyaToken) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Bilka LoginJWT fejlede: ${res.status} — ${body.slice(0, 300)}`);
+    throw new Error(`Bilka LoginJWT fejlede: ${res.status} [tokenLen:${gigyaToken?.length}] — ${body.slice(0, 300)}`);
   }
 
   // Udpak session-cookies (name=value pairs)
