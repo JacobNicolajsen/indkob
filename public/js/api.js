@@ -83,13 +83,6 @@ export const ics = {
   refresh: ()     => req('POST', '/ics/refresh', {}),
 };
 
-// ── BilkaToGo agent ───────────────────────────────────────────────
-export const bilkatogo = {
-  status:   ()           => req('GET',  '/bilkatogo/status'),
-  fill:     (jwt_token)  => req('POST', '/bilkatogo/fill', { jwt_token }),
-  rollback: ()           => req('POST', '/bilkatogo/rollback', {}),
-};
-
 // ── Basisvarer ────────────────────────────────────────────────────
 export const staples = {
   list:      ()        => req('GET',    '/staples'),

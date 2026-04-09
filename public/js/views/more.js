@@ -5,12 +5,10 @@ export async function renderMore(container) {
   setTopActions('');
 
   // Hent evt. gemt ICS-URL
-  let icsUrl = '', bilkaEmail = '', bilkaPass = '';
+  let icsUrl = '';
   try {
     const s = await settingsApi.getAll();
-    icsUrl    = s.ics_url           || '';
-    bilkaEmail = s.bilkatogo_email  || '';
-    bilkaPass  = s.bilkatogo_password ? '••••••••' : '';
+    icsUrl = s.ics_url || '';
   } catch { /* ignorer */ }
 
   container.innerHTML = `
@@ -36,21 +34,6 @@ export async function renderMore(container) {
           placeholder="https://…/kalender.ics" value="${icsUrl}"
           style="flex:1;font-size:0.85rem">
         <button class="btn btn-primary" id="btn-ics-save">Gem</button>
-      </div>
-    </div>
-
-    <div class="section-header">BilkaToGo</div>
-    <div style="background:var(--surface);border-radius:14px;margin:0 16px;overflow:hidden;box-shadow:0 2px 10px var(--shadow-warm);padding:14px 16px">
-      <div style="font-size:0.85rem;color:var(--ink-muted);margin-bottom:10px;line-height:1.5">
-        Log ind med din BilkaToGo-konto for automatisk at fylde kurven fra indkøbslisten.
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <input class="form-input" id="bilka-email" type="email"
-          placeholder="Email" value="${bilkaEmail}" autocomplete="email">
-        <input class="form-input" id="bilka-password" type="password"
-          placeholder="${bilkaPass ? 'Adgangskode gemt (overskriv for at ændre)' : 'Adgangskode'}"
-          autocomplete="current-password">
-        <button class="btn btn-primary" id="btn-bilka-save">Gem BilkaToGo-login</button>
       </div>
     </div>
 
@@ -85,19 +68,6 @@ export async function renderMore(container) {
 
   container.querySelector('#go-catalog').addEventListener('click', () => {
     navigate('catalog', { backTo: 'more' });
-  });
-
-  container.querySelector('#btn-bilka-save').addEventListener('click', async () => {
-    const email = container.querySelector('#bilka-email').value.trim();
-    const pass  = container.querySelector('#bilka-password').value;
-    if (!email) { alert('Email er påkrævet'); return; }
-    try {
-      await settingsApi.set('bilkatogo_email', email);
-      if (pass) await settingsApi.set('bilkatogo_password', pass);
-      const btn = container.querySelector('#btn-bilka-save');
-      btn.textContent = '✓ Gemt';
-      setTimeout(() => { btn.textContent = 'Gem BilkaToGo-login'; }, 2000);
-    } catch (e) { alert('Fejl: ' + e.message); }
   });
 
   container.querySelector('#btn-ics-save').addEventListener('click', async () => {

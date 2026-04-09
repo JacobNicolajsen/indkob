@@ -25,7 +25,6 @@ app.use('/api/notes',        require('./server/routes/notes'));
 app.use('/api/settings',     require('./server/routes/settings'));
 app.use('/api/ics',          require('./server/routes/ics'));
 app.use('/api/staples',      require('./server/routes/staples'));
-app.use('/api/bilkatogo',   require('./server/routes/bilkatogo'));
 
 app.get('*', (req, res) =>
   res.sendFile(path.join(__dirname, 'public', 'index.html'))
