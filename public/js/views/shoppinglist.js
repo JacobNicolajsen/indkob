@@ -1,4 +1,4 @@
-import { shoppinglist as api, products as productsApi } from '../api.js';
+import { shoppinglist as api, products as productsApi, bilkatogo as bilkaApi } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
 import { UNITS } from '../constants.js';
 
@@ -19,6 +19,7 @@ export async function renderShoppinglist(container) {
   container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-muted)">Henter indkøbsliste…</div>';
 
   setTopActions(`
+    <button class="top-action" id="btn-bilka"      title="Send til BilkaToGo">🛒</button>
     <button class="top-action" id="btn-shop-print" title="Print indkøbsliste">🖨️</button>
     <button class="top-action" id="btn-shop-menu"  title="Muligheder">⋯</button>
   `);
@@ -32,6 +33,9 @@ export async function renderShoppinglist(container) {
 
   renderList(container);
 
+  document.getElementById('btn-bilka')?.addEventListener('click', () => {
+    showBilkaSheet(container);
+  });
   document.getElementById('btn-shop-print')?.addEventListener('click', () => {
     printShoppingList();
   });
@@ -361,6 +365,108 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:2px}
 </div>`;
 
   printHtml(html);
+}
+
+async function showBilkaSheet(container) {
+  // Tjek eksisterende session
+  let session = null;
+  try { session = await bilkaApi.status(); } catch { /* ignorer */ }
+
+  const frag = document.createElement('div');
+
+  const renderContent = (state) => {
+    if (state === 'filling') {
+      frag.innerHTML = `
+        <div style="text-align:center;padding:32px 16px">
+          <div style="font-size:2.5rem;margin-bottom:12px">⏳</div>
+          <div style="font-weight:600;font-size:1.05rem;margin-bottom:8px">Fylder kurven…</div>
+          <div style="font-size:0.85rem;color:var(--ink-muted)">Søger og tilføjer varer til BilkaToGo</div>
+        </div>`;
+      return;
+    }
+    if (state === 'rolling') {
+      frag.innerHTML = `
+        <div style="text-align:center;padding:32px 16px">
+          <div style="font-size:2.5rem;margin-bottom:12px">↩️</div>
+          <div style="font-weight:600;font-size:1.05rem">Fortryder…</div>
+        </div>`;
+      return;
+    }
+
+    const hasSession = session?.rollback?.length > 0;
+    const results    = session?.results || [];
+
+    const rowsHtml = results.map(r => {
+      if (r.status === 'tilføjet') {
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="color:#22c55e;font-size:1.1rem">✓</span>
+          <div style="flex:1">
+            <div style="font-weight:500;font-size:0.9rem">${r.item}</div>
+            <div style="font-size:0.78rem;color:var(--ink-muted)">${r.product}${r.brand ? ' · ' + r.brand : ''} — ${r.priceDKK} kr</div>
+          </div>
+          <span style="font-size:0.82rem;color:var(--ink-muted)">${r.qty} stk</span>
+        </div>`;
+      }
+      const icon  = r.status === 'ikke_fundet' ? '🔍' : '⚠️';
+      const label = r.status === 'ikke_fundet' ? 'Ikke fundet' : r.error || r.status;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:1.1rem">${icon}</span>
+        <div style="flex:1">
+          <div style="font-weight:500;font-size:0.9rem">${r.item}</div>
+          <div style="font-size:0.78rem;color:var(--ink-muted)">${label}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const sessionInfo = hasSession
+      ? `<div style="background:#f0fdf4;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:0.85rem">
+           <span style="color:#16a34a;font-weight:600">✓ ${session.added} varer tilføjet</span>
+           <span style="color:var(--ink-muted)"> · ${new Date(session.time).toLocaleString('da-DK', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+         </div>`
+      : '';
+
+    frag.innerHTML = `
+      ${sessionInfo}
+      <button class="btn btn-primary" id="btn-bilka-fill" style="width:100%;margin-bottom:${hasSession ? '10px' : '16px'}">
+        🛒 Fyld BilkaToGo-kurven
+      </button>
+      ${hasSession ? `<button class="btn" id="btn-bilka-rollback" style="width:100%;margin-bottom:16px;background:var(--surface-muted)">
+        ↩️ Fortryd seneste fyldning (${session.rollback.length} varer)
+      </button>` : ''}
+      ${rowsHtml ? `<div style="font-weight:600;margin-bottom:8px;font-size:0.9rem">Seneste resultat</div>
+      <div style="max-height:300px;overflow-y:auto">${rowsHtml}</div>` : ''}
+      <div style="height:8px"></div>
+    `;
+
+    frag.querySelector('#btn-bilka-fill')?.addEventListener('click', async () => {
+      renderContent('filling');
+      try {
+        const result = await bilkaApi.fill();
+        session = await bilkaApi.status();
+        renderContent('done');
+        toast(`✓ ${result.added} varer tilføjet til BilkaToGo`);
+      } catch (e) {
+        renderContent('done');
+        toast('Fejl: ' + e.message);
+      }
+    });
+
+    frag.querySelector('#btn-bilka-rollback')?.addEventListener('click', async () => {
+      renderContent('rolling');
+      try {
+        const result = await bilkaApi.rollback();
+        session = null;
+        renderContent('done');
+        toast(`↩️ ${result.restored} varer fjernet fra kurven`);
+      } catch (e) {
+        renderContent('done');
+        toast('Fejl: ' + e.message);
+      }
+    });
+  };
+
+  renderContent('done');
+  openSheet('BilkaToGo', frag);
 }
 
 async function openLibrarySheet(container) {
