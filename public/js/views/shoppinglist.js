@@ -2,43 +2,40 @@ import { shoppinglist as api, products as productsApi, bilkatogo as bilkaApi, se
 import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
 import { UNITS } from '../constants.js';
 
-// ── Gigya browser-auth (direkte REST, ingen SDK) ──────────────────
-// Gigya SDK kræver domæne-registrering (bilkatogo.dk). Vi bruger i stedet
-// direkte fetch-kald fra browseren — Gigya tillader dette via CORS.
-const GIGYA_KEY  = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
-const GIGYA_BASE = 'https://accounts.eu1.gigya.com';
+// ── Gigya browser-auth via server-session + JSONP ─────────────────
+// Gigya blokerer: SDK (forkert domæne), fetch (CORS), server (403007).
+// Løsning: server henter session-token (virker) → browser kalder
+// accounts.getJWT via JSONP <script>-tag som bypasser CORS.
+const GIGYA_KEY = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
 
-async function gigyaBrowserAuth(email, password) {
-  // Trin 1: accounts.login → sessionToken
-  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }),
-    credentials: 'include',
-  });
-  const loginData = await loginRes.json();
-  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
+async function gigyaBrowserAuth() {
+  // Trin 1: Server logger ind og returnerer session-token
+  const r = await fetch('/api/bilkatogo/get-session', { method: 'POST' });
+  const { sessionToken, error } = await r.json();
+  if (error) throw new Error(error);
 
-  const si    = loginData.sessionInfo || {};
-  const token = si.sessionToken || si.cookieValue;
-  if (!token) throw new Error('Gigya: intet session-token i svar');
-
-  // Trin 2: accounts.getJWT fra browser (ikke server) — 403007 sker kun server-side
-  const jwtRes = await fetch(`${GIGYA_BASE}/accounts.getJWT`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
+  // Trin 2: accounts.getJWT via JSONP (omgår CORS og 403007)
+  return new Promise((resolve, reject) => {
+    const cb = `_gc${Date.now()}`;
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      script.remove(); delete window[cb];
+      reject(new Error('Gigya getJWT JSONP timeout'));
+    }, 15000);
+    window[cb] = (data) => {
+      clearTimeout(timer); script.remove(); delete window[cb];
+      if (data.errorCode === 0 && data.id_token) resolve(data.id_token);
+      else reject(new Error(`Gigya getJWT (${data.errorCode}): ${data.errorMessage}`));
+    };
+    const params = new URLSearchParams({
       apiKey: GIGYA_KEY, format: 'json',
       fields: 'profile.email,profile.firstName',
-      oauth_token: token,
-    }),
-    credentials: 'include',
+      oauth_token: sessionToken, callback: cb,
+    });
+    script.src = `https://accounts.eu1.gigya.com/accounts.getJWT?${params}`;
+    script.onerror = () => { clearTimeout(timer); reject(new Error('JSONP script fejlede')); };
+    document.head.appendChild(script);
   });
-  const jwtData = await jwtRes.json();
-  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
-  const jwt = jwtData.id_token;
-  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
-  return jwt;
 }
 
 const SHOP_CATEGORIES = [
@@ -481,13 +478,7 @@ async function showBilkaSheet(container) {
       renderContent('filling');
       try {
         // Hent credentials og autentificer via Gigya SDK i browseren
-        const s = await settingsApi.getAll();
-        if (!s.bilkatogo_email || !s.bilkatogo_password) {
-          renderContent('done');
-          toast('Konfigurer BilkaToGo-login under Mere');
-          return;
-        }
-        const jwt = await gigyaBrowserAuth(s.bilkatogo_email, s.bilkatogo_password);
+        const jwt = await gigyaBrowserAuth();
         const result = await bilkaApi.fill(jwt);
         session = await bilkaApi.status();
         renderContent('done');

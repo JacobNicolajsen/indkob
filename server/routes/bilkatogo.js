@@ -3,6 +3,8 @@ const router  = express.Router();
 const db      = require('../db');
 
 // ── Konstanter ────────────────────────────────────────────────────
+const GIGYA_KEY    = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
+const GIGYA_BASE   = 'https://accounts.eu1.gigya.com';
 const BILKA_BASE   = 'https://api.bilkatogo.dk';
 const ALGOLIA_APP  = 'f9vbjlr1bk';
 const ALGOLIA_KEY  = '1deaf41c87e729779f7695c00f190cc9';
@@ -86,6 +88,32 @@ async function getCart(cookie) {
 // ─────────────────────────────────────────────────────────────────
 // GET /api/bilkatogo/status
 // ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// POST /api/bilkatogo/get-session
+// Server henter Gigya session-token og returnerer til browser.
+// Browseren bruger det til JSONP-kald til accounts.getJWT (omgår CORS+403007).
+// ─────────────────────────────────────────────────────────────────
+router.post('/get-session', async (req, res) => {
+  const email    = getSetting('bilkatogo_email');
+  const password = getSetting('bilkatogo_password');
+  if (!email || !password) return res.status(400).json({ error: 'BilkaToGo login ikke konfigureret.' });
+  try {
+    const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }).toString()
+    });
+    const d = await loginRes.json();
+    if (d.errorCode !== 0) return res.status(401).json({ error: `Gigya login: ${d.errorMessage || d.errorCode}` });
+    const si    = d.sessionInfo || {};
+    const token = si.sessionToken || si.cookieValue;
+    if (!token) return res.status(500).json({ error: 'Ingen session token fra Gigya' });
+    res.json({ sessionToken: token });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/status', (req, res) => {
   const raw = getSetting('bilkatogo_last_fill');
   res.json(raw ? JSON.parse(raw) : null);
