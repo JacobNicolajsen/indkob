@@ -20,40 +20,21 @@ function setSetting(key, value) {
   ).run(key, String(value));
 }
 
-// ── Gigya login → JWT ─────────────────────────────────────────────
+// ── Gigya login → session token ───────────────────────────────────
 async function gigyaLogin(email, password) {
-  // Trin 1: login → sessionToken + sessionSecret
-  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
+  const res = await fetch(`${GIGYA_BASE}/accounts.login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }).toString()
   });
-  const loginData = await loginRes.json();
-  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
+  const data = await res.json();
+  if (data.errorCode !== 0) throw new Error(`Gigya login: ${data.errorMessage || data.errorCode}`);
 
-  // Gigya kan returnere enten sessionToken (token-mode) eller cookieValue (cookie-mode)
-  const si = loginData.sessionInfo || {};
-  const oauthToken = si.sessionToken || si.cookieValue;
-  const secret     = si.sessionSecret || '';
-  if (!oauthToken) throw new Error(`Gigya sessionInfo mangler token (sessionInfo keys: ${Object.keys(si).join(',')})`);
-
-  // Trin 2: hent JWT via getJWT
-  const jwtRes = await fetch(`${GIGYA_BASE}/accounts.getJWT`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      apiKey:      GIGYA_KEY,
-      oauth_token: oauthToken,
-      secret,
-      format:      'json',
-      fields:      'profile.email,profile.firstName',
-    }).toString()
-  });
-  const jwtData = await jwtRes.json();
-  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT: ${jwtData.errorMessage || jwtData.errorCode}`);
-  const jwt = jwtData.id_token;
-  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
-  return jwt;
+  // Gigya returnerer enten sessionToken (token-mode) eller cookieValue (cookie-mode)
+  const si = data.sessionInfo || {};
+  const token = si.sessionToken || si.cookieValue;
+  if (!token) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
+  return token;
 }
 
 // ── Bilka JWT-login → session cookie ─────────────────────────────
