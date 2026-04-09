@@ -31,9 +31,11 @@ async function gigyaLogin(email, password) {
   const loginData = await loginRes.json();
   if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
 
-  const sessionToken  = loginData.sessionInfo?.sessionToken;
-  const sessionSecret = loginData.sessionInfo?.sessionSecret;
-  if (!sessionToken) throw new Error(`Gigya returnerede intet session-token (keys: ${Object.keys(loginData).join(',')})`);
+  // Gigya kan returnere enten sessionToken (token-mode) eller cookieValue (cookie-mode)
+  const si = loginData.sessionInfo || {};
+  const oauthToken = si.sessionToken || si.cookieValue;
+  const secret     = si.sessionSecret || '';
+  if (!oauthToken) throw new Error(`Gigya sessionInfo mangler token (sessionInfo keys: ${Object.keys(si).join(',')})`);
 
   // Trin 2: hent JWT via getJWT
   const jwtRes = await fetch(`${GIGYA_BASE}/accounts.getJWT`, {
@@ -41,8 +43,8 @@ async function gigyaLogin(email, password) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       apiKey:      GIGYA_KEY,
-      oauth_token: sessionToken,
-      secret:      sessionSecret || '',
+      oauth_token: oauthToken,
+      secret,
       format:      'json',
       fields:      'profile.email,profile.firstName',
     }).toString()
