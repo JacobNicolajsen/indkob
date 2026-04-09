@@ -42,14 +42,10 @@ async function gigyaLogin(email, password) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       loginID: email, password, apiKey: GIGYA_KEY, format: 'json',
-      include: 'id_token,profile',
     }).toString()
   });
   const loginData = await loginRes.json();
   if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
-
-  // Hvis Gigya returnerer JWT direkte fra login — brug den
-  if (loginData.id_token) return loginData.id_token;
 
   const si          = loginData.sessionInfo || {};
   const cookieValue = si.sessionToken || si.cookieValue;
