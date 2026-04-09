@@ -36,35 +36,39 @@ function gigyaSign(secret, url, params) {
 
 // ── Gigya login → JWT (id_token) ──────────────────────────────────
 async function gigyaLogin(email, password) {
-  // Trin 1: accounts.login → sessionToken + sessionSecret
+  // Trin 1: accounts.login — bed om id_token direkte i svaret
   const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }).toString()
+    body: new URLSearchParams({
+      loginID: email, password, apiKey: GIGYA_KEY, format: 'json',
+      include: 'id_token,profile',
+    }).toString()
   });
   const loginData = await loginRes.json();
   if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
 
+  // Hvis Gigya returnerer JWT direkte fra login — brug den
+  if (loginData.id_token) return loginData.id_token;
+
   const si          = loginData.sessionInfo || {};
   const cookieValue = si.sessionToken || si.cookieValue;
-  if (!cookieValue) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
+  if (!cookieValue) throw new Error(`Gigya: intet token (sessionInfo keys: ${Object.keys(si).join(',')})`);
 
-  // Trin 2: accounts.getJWT via browser-style session cookie (glt_<apiKey>)
-  // accounts.getJWT blokerer server-til-server oauth_token kald (403007),
-  // men accepterer den session-cookie som browseren bruger.
+  // Trin 2: accounts.getJWT med browser-kontekst (Origin + Referer + session cookie)
   const jwtUrl = `${GIGYA_BASE}/accounts.getJWT`;
   const jwtRes = await fetch(jwtUrl, {
     method:  'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
       'Cookie':       `glt_${GIGYA_KEY}=${cookieValue}`,
+      'Origin':       'https://www.bilkatogo.dk',
+      'Referer':      'https://www.bilkatogo.dk/',
+      'User-Agent':   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
     },
     body: new URLSearchParams({
-      apiKey:  GIGYA_KEY,
-      format:  'json',
-      fields:  'profile.email',
-      sdk:     'js_latest',
-      targetEnv: 'jssdk',
+      apiKey: GIGYA_KEY, format: 'json', fields: 'profile.email',
+      sdk: 'js_latest', targetEnv: 'jssdk',
     }).toString()
   });
   const jwtData = await jwtRes.json();
