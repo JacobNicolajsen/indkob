@@ -89,7 +89,7 @@ async function bilkaLogin(gigyaToken) {
       'Referer':      'https://www.bilkatogo.dk/',
       'User-Agent':   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
     },
-    body: JSON.stringify({ token: gigyaToken })
+    body: JSON.stringify({ jwt_token: gigyaToken })
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
