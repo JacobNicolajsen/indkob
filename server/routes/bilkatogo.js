@@ -84,11 +84,17 @@ async function bilkaLogin(gigyaToken) {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${gigyaToken}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Origin':       'https://www.bilkatogo.dk',
+      'Referer':      'https://www.bilkatogo.dk/',
+      'User-Agent':   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
     },
     body: JSON.stringify({ token: gigyaToken })
   });
-  if (!res.ok) throw new Error(`Bilka LoginJWT fejlede: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Bilka LoginJWT fejlede: ${res.status} — ${body.slice(0, 300)}`);
+  }
 
   // Udpak session-cookies (name=value pairs)
   const rawCookies = res.headers.getSetCookie?.() ?? (res.headers.get('set-cookie') ? [res.headers.get('set-cookie')] : []);
