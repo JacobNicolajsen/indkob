@@ -1,5 +1,6 @@
 const express = require('express');
 const router  = express.Router();
+const crypto  = require('crypto');
 const db      = require('../db');
 
 // ── Konstanter ────────────────────────────────────────────────────
@@ -20,21 +21,53 @@ function setSetting(key, value) {
   ).run(key, String(value));
 }
 
-// ── Gigya login → session token ───────────────────────────────────
+// ── HMAC-SHA1 signering til Gigya REST API ────────────────────────
+function gigyaSign(secret, url, params) {
+  const nonce     = Date.now().toString() + Math.floor(Math.random() * 1e6);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const all       = { ...params, nonce, timestamp };
+  const paramStr  = Object.keys(all).sort()
+    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(all[k])}`).join('&');
+  const base = `POST&${encodeURIComponent(url)}&${encodeURIComponent(paramStr)}`;
+  const key  = Buffer.from(secret, 'base64');
+  const sig  = crypto.createHmac('sha1', key).update(base).digest('base64');
+  return { ...all, sig };
+}
+
+// ── Gigya login → JWT (id_token) ──────────────────────────────────
 async function gigyaLogin(email, password) {
-  const res = await fetch(`${GIGYA_BASE}/accounts.login`, {
+  // Trin 1: accounts.login → sessionToken + sessionSecret
+  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }).toString()
   });
-  const data = await res.json();
-  if (data.errorCode !== 0) throw new Error(`Gigya login: ${data.errorMessage || data.errorCode}`);
+  const loginData = await loginRes.json();
+  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
 
-  // Gigya returnerer enten sessionToken (token-mode) eller cookieValue (cookie-mode)
-  const si = data.sessionInfo || {};
-  const token = si.sessionToken || si.cookieValue;
-  if (!token) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
-  return token;
+  const si            = loginData.sessionInfo || {};
+  const sessionToken  = si.sessionToken  || si.cookieValue;
+  const sessionSecret = si.sessionSecret || '';
+  if (!sessionToken) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
+
+  // Trin 2: accounts.getJWT med HMAC-SHA1 signering
+  const jwtUrl    = `${GIGYA_BASE}/accounts.getJWT`;
+  const jwtParams = gigyaSign(sessionSecret, jwtUrl, {
+    apiKey:      GIGYA_KEY,
+    oauth_token: sessionToken,
+    format:      'json',
+    fields:      'profile.email',
+  });
+  const jwtRes  = await fetch(jwtUrl, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    new URLSearchParams(jwtParams).toString()
+  });
+  const jwtData = await jwtRes.json();
+  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
+  const jwt = jwtData.id_token;
+  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
+  return jwt;
 }
 
 // ── Bilka JWT-login → session cookie ─────────────────────────────
