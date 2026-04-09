@@ -85,9 +85,9 @@ export const ics = {
 
 // ── BilkaToGo agent ───────────────────────────────────────────────
 export const bilkatogo = {
-  status:   ()  => req('GET',  '/bilkatogo/status'),
-  fill:     ()  => req('POST', '/bilkatogo/fill', {}),
-  rollback: ()  => req('POST', '/bilkatogo/rollback', {}),
+  status:   ()           => req('GET',  '/bilkatogo/status'),
+  fill:     (jwt_token)  => req('POST', '/bilkatogo/fill', { jwt_token }),
+  rollback: ()           => req('POST', '/bilkatogo/rollback', {}),
 };
 
 // ── Basisvarer ────────────────────────────────────────────────────

@@ -1,6 +1,45 @@
-import { shoppinglist as api, products as productsApi, bilkatogo as bilkaApi } from '../api.js';
+import { shoppinglist as api, products as productsApi, bilkatogo as bilkaApi, settings as settingsApi } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
 import { UNITS } from '../constants.js';
+
+// ── Gigya browser-auth ────────────────────────────────────────────
+const GIGYA_KEY = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
+
+function loadGigyaSdk() {
+  return new Promise((resolve, reject) => {
+    if (window.gigya?.accounts) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = `https://cdns.eu1.gigya.com/js/gigya.js?apikey=${GIGYA_KEY}`;
+    s.onerror = () => reject(new Error('Kunne ikke loade Gigya SDK'));
+    document.head.appendChild(s);
+    // Vent på at gigya.accounts er initialiseret
+    const t0 = Date.now();
+    const poll = setInterval(() => {
+      if (window.gigya?.accounts) { clearInterval(poll); resolve(); }
+      else if (Date.now() - t0 > 12000) { clearInterval(poll); reject(new Error('Gigya SDK timeout')); }
+    }, 100);
+  });
+}
+
+async function gigyaBrowserAuth(email, password) {
+  await loadGigyaSdk();
+
+  // Login med BilkaToGo-credentials
+  await new Promise((resolve, reject) => {
+    gigya.accounts.login({
+      loginID: email, password,
+      callback: r => r.errorCode === 0 ? resolve() : reject(new Error(`Gigya login: ${r.errorMessage || r.errorCode}`))
+    });
+  });
+
+  // Hent JWT
+  return new Promise((resolve, reject) => {
+    gigya.accounts.getJWT({
+      fields: 'profile.email,profile.firstName',
+      callback: r => r.errorCode === 0 ? resolve(r.id_token) : reject(new Error(`Gigya getJWT: ${r.errorMessage || r.errorCode}`))
+    });
+  });
+}
 
 const SHOP_CATEGORIES = [
   'Frugt & Grønt', 'Kød & Fisk', 'Mejeri & Æg', 'Brød & Bageri',
@@ -441,7 +480,15 @@ async function showBilkaSheet(container) {
     frag.querySelector('#btn-bilka-fill')?.addEventListener('click', async () => {
       renderContent('filling');
       try {
-        const result = await bilkaApi.fill();
+        // Hent credentials og autentificer via Gigya SDK i browseren
+        const s = await settingsApi.getAll();
+        if (!s.bilkatogo_email || !s.bilkatogo_password) {
+          renderContent('done');
+          toast('Konfigurer BilkaToGo-login under Mere');
+          return;
+        }
+        const jwt = await gigyaBrowserAuth(s.bilkatogo_email, s.bilkatogo_password);
+        const result = await bilkaApi.fill(jwt);
         session = await bilkaApi.status();
         renderContent('done');
         toast(`✓ ${result.added} varer tilføjet til BilkaToGo`);

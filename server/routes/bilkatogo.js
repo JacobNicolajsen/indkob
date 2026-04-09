@@ -1,11 +1,8 @@
 const express = require('express');
 const router  = express.Router();
-const crypto  = require('crypto');
 const db      = require('../db');
 
 // ── Konstanter ────────────────────────────────────────────────────
-const GIGYA_KEY    = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
-const GIGYA_BASE   = 'https://accounts.eu1.gigya.com';
 const BILKA_BASE   = 'https://api.bilkatogo.dk';
 const ALGOLIA_APP  = 'f9vbjlr1bk';
 const ALGOLIA_KEY  = '1deaf41c87e729779f7695c00f190cc9';
@@ -21,66 +18,9 @@ function setSetting(key, value) {
   ).run(key, String(value));
 }
 
-// ── HMAC-SHA1 signering til Gigya REST API ────────────────────────
-function gigyaSign(secret, url, params) {
-  const nonce     = Date.now().toString() + Math.floor(Math.random() * 1e6);
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const all       = { ...params, nonce, timestamp };
-  const paramStr  = Object.keys(all).sort()
-    .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(all[k])}`).join('&');
-  const base = `POST&${encodeURIComponent(url)}&${encodeURIComponent(paramStr)}`;
-  const key  = Buffer.from(secret, 'base64');
-  const sig  = crypto.createHmac('sha1', key).update(base).digest('base64');
-  return { ...all, sig };
-}
-
-// ── Gigya login → JWT (id_token) ──────────────────────────────────
-async function gigyaLogin(email, password) {
-  // Trin 1: accounts.login — bed om id_token direkte i svaret
-  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      loginID: email, password, apiKey: GIGYA_KEY, format: 'json',
-    }).toString()
-  });
-  const loginData = await loginRes.json();
-  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
-
-  const si          = loginData.sessionInfo || {};
-  const cookieValue = si.sessionToken || si.cookieValue;
-  if (!cookieValue) throw new Error(`Gigya: intet token (sessionInfo keys: ${Object.keys(si).join(',')})`);
-
-  // Trin 2: accounts.getJWT via EU1 FIDM-endpoint (producerer korrekt iss: fidm.eu1.gigya.com)
-  // accounts.eu1.gigya.com/accounts.getJWT returnerer 403007 server-side,
-  // men fidm.eu1.gigya.com er JWT-specifikt og har andre adgangskrav.
-  const fidmUrl = 'https://fidm.eu1.gigya.com/accounts.getJWT';
-  const jwtRes  = await fetch(fidmUrl, {
-    method:  'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Cookie':       `glt_${GIGYA_KEY}=${cookieValue}`,
-      'Origin':       'https://www.bilkatogo.dk',
-      'Referer':      'https://www.bilkatogo.dk/',
-      'User-Agent':   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
-    },
-    body: new URLSearchParams({
-      apiKey: GIGYA_KEY, format: 'json',
-      fields: 'profile.email,profile.firstName',
-      sdk: 'js_latest', targetEnv: 'jssdk',
-    }).toString()
-  });
-  const jwtData = await jwtRes.json();
-  if (jwtData.errorCode !== 0) throw new Error(`Gigya FIDM getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
-  const jwt = jwtData.id_token;
-  if (!jwt) throw new Error('Gigya FIDM getJWT returnerede intet id_token');
-  return jwt;
-}
-
 // ── Bilka JWT-login → session cookie ─────────────────────────────
+// JWT hentes browser-side via Gigya SDK og sendes med fra frontend.
 async function bilkaLogin(gigyaToken) {
-  console.log('[bilka] token type:', typeof gigyaToken, '| length:', gigyaToken?.length, '| prefix:', gigyaToken?.slice(0, 30));
-
   const res = await fetch(`${BILKA_BASE}/api/auth/LoginJWT?u=w`, {
     method: 'POST',
     headers: {
@@ -94,11 +34,7 @@ async function bilkaLogin(gigyaToken) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    let claims = '';
-    try {
-      claims = Buffer.from(gigyaToken.split('.')[1], 'base64url').toString();
-    } catch {}
-    throw new Error(`Bilka LoginJWT fejlede: ${res.status} | JWT claims: ${claims} | Bilka: ${body.slice(0, 200)}`);
+    throw new Error(`Bilka LoginJWT fejlede: ${res.status} — ${body.slice(0, 200)}`);
   }
 
   // Udpak session-cookies (name=value pairs)
@@ -160,10 +96,9 @@ router.get('/status', (req, res) => {
 // Fylder BilkaToGo-kurven med det billigste alternativ per vare
 // ─────────────────────────────────────────────────────────────────
 router.post('/fill', async (req, res) => {
-  const email    = getSetting('bilkatogo_email');
-  const password = getSetting('bilkatogo_password');
-  if (!email || !password) {
-    return res.status(400).json({ error: 'BilkaToGo login er ikke konfigureret under Mere.' });
+  const { jwt_token } = req.body || {};
+  if (!jwt_token) {
+    return res.status(400).json({ error: 'jwt_token mangler — Gigya-login skal ske fra browseren.' });
   }
 
   // Hent kun ikke-afkrydsede varer
@@ -175,9 +110,8 @@ router.post('/fill', async (req, res) => {
   }
 
   try {
-    // 1. Autentificering
-    const gigyaToken = await gigyaLogin(email, password);
-    const cookie     = await bilkaLogin(gigyaToken);
+    // 1. Brug JWT fra browser til at hente Bilka session cookie
+    const cookie = await bilkaLogin(jwt_token);
 
     // 2. Snapshot af nuværende kurv (til rollback)
     const cart    = await getCart(cookie);
