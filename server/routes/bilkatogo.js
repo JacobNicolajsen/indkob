@@ -45,23 +45,27 @@ async function gigyaLogin(email, password) {
   const loginData = await loginRes.json();
   if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
 
-  const si            = loginData.sessionInfo || {};
-  const sessionToken  = si.sessionToken  || si.cookieValue;
-  const sessionSecret = si.sessionSecret || '';
-  if (!sessionToken) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
+  const si          = loginData.sessionInfo || {};
+  const cookieValue = si.sessionToken || si.cookieValue;
+  if (!cookieValue) throw new Error(`Gigya sessionInfo mangler token (keys: ${Object.keys(si).join(',')})`);
 
-  // Trin 2: accounts.getJWT med HMAC-SHA1 signering
-  const jwtUrl    = `${GIGYA_BASE}/accounts.getJWT`;
-  const jwtParams = gigyaSign(sessionSecret, jwtUrl, {
-    apiKey:      GIGYA_KEY,
-    oauth_token: sessionToken,
-    format:      'json',
-    fields:      'profile.email',
-  });
-  const jwtRes  = await fetch(jwtUrl, {
+  // Trin 2: accounts.getJWT via browser-style session cookie (glt_<apiKey>)
+  // accounts.getJWT blokerer server-til-server oauth_token kald (403007),
+  // men accepterer den session-cookie som browseren bruger.
+  const jwtUrl = `${GIGYA_BASE}/accounts.getJWT`;
+  const jwtRes = await fetch(jwtUrl, {
     method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:    new URLSearchParams(jwtParams).toString()
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie':       `glt_${GIGYA_KEY}=${cookieValue}`,
+    },
+    body: new URLSearchParams({
+      apiKey:  GIGYA_KEY,
+      format:  'json',
+      fields:  'profile.email',
+      sdk:     'js_latest',
+      targetEnv: 'jssdk',
+    }).toString()
   });
   const jwtData = await jwtRes.json();
   if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
