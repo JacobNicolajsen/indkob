@@ -95,7 +95,7 @@ async function bilkaLogin(gigyaToken) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Bilka LoginJWT fejlede: ${res.status} [tokenLen:${gigyaToken?.length}] — ${body.slice(0, 300)}`);
+    throw new Error(`Bilka LoginJWT fejlede: ${res.status} [len:${gigyaToken?.length}, prefix:${gigyaToken?.slice(0,20)}] — ${body.slice(0, 200)}`);
   }
 
   // Udpak session-cookies (name=value pairs)
