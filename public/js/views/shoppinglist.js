@@ -2,43 +2,43 @@ import { shoppinglist as api, products as productsApi, bilkatogo as bilkaApi, se
 import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
 import { UNITS } from '../constants.js';
 
-// ── Gigya browser-auth ────────────────────────────────────────────
-const GIGYA_KEY = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
-
-function loadGigyaSdk() {
-  return new Promise((resolve, reject) => {
-    if (window.gigya?.accounts) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = `https://cdns.eu1.gigya.com/js/gigya.js?apikey=${GIGYA_KEY}`;
-    s.onerror = () => reject(new Error('Kunne ikke loade Gigya SDK'));
-    document.head.appendChild(s);
-    // Vent på at gigya.accounts er initialiseret
-    const t0 = Date.now();
-    const poll = setInterval(() => {
-      if (window.gigya?.accounts) { clearInterval(poll); resolve(); }
-      else if (Date.now() - t0 > 12000) { clearInterval(poll); reject(new Error('Gigya SDK timeout')); }
-    }, 100);
-  });
-}
+// ── Gigya browser-auth (direkte REST, ingen SDK) ──────────────────
+// Gigya SDK kræver domæne-registrering (bilkatogo.dk). Vi bruger i stedet
+// direkte fetch-kald fra browseren — Gigya tillader dette via CORS.
+const GIGYA_KEY  = '3_tA6BbV434FQqN73HnUG1KA3qFv8KiG4OqLu9eWPh7sKRqRizH5Vfv5Larmgrb4I2';
+const GIGYA_BASE = 'https://accounts.eu1.gigya.com';
 
 async function gigyaBrowserAuth(email, password) {
-  await loadGigyaSdk();
-
-  // Login med BilkaToGo-credentials
-  await new Promise((resolve, reject) => {
-    gigya.accounts.login({
-      loginID: email, password,
-      callback: r => r.errorCode === 0 ? resolve() : reject(new Error(`Gigya login: ${r.errorMessage || r.errorCode}`))
-    });
+  // Trin 1: accounts.login → sessionToken
+  const loginRes = await fetch(`${GIGYA_BASE}/accounts.login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ loginID: email, password, apiKey: GIGYA_KEY, format: 'json' }),
+    credentials: 'include',
   });
+  const loginData = await loginRes.json();
+  if (loginData.errorCode !== 0) throw new Error(`Gigya login: ${loginData.errorMessage || loginData.errorCode}`);
 
-  // Hent JWT
-  return new Promise((resolve, reject) => {
-    gigya.accounts.getJWT({
+  const si    = loginData.sessionInfo || {};
+  const token = si.sessionToken || si.cookieValue;
+  if (!token) throw new Error('Gigya: intet session-token i svar');
+
+  // Trin 2: accounts.getJWT fra browser (ikke server) — 403007 sker kun server-side
+  const jwtRes = await fetch(`${GIGYA_BASE}/accounts.getJWT`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      apiKey: GIGYA_KEY, format: 'json',
       fields: 'profile.email,profile.firstName',
-      callback: r => r.errorCode === 0 ? resolve(r.id_token) : reject(new Error(`Gigya getJWT: ${r.errorMessage || r.errorCode}`))
-    });
+      oauth_token: token,
+    }),
+    credentials: 'include',
   });
+  const jwtData = await jwtRes.json();
+  if (jwtData.errorCode !== 0) throw new Error(`Gigya getJWT (${jwtData.errorCode}): ${jwtData.errorMessage}`);
+  const jwt = jwtData.id_token;
+  if (!jwt) throw new Error('Gigya getJWT returnerede intet id_token');
+  return jwt;
 }
 
 const SHOP_CATEGORIES = [
