@@ -193,10 +193,13 @@ function openAiImport(onDone) {
   const goBtn    = frag.querySelector('#btn-ai-go');
   const status   = frag.querySelector('#ai-status');
 
-  // Indsæt evt. URL fra clipboard
-  navigator.clipboard?.readText?.().then(text => {
-    if (text?.startsWith('http') && !urlInput.value) urlInput.value = text;
-  }).catch(() => {});
+  // Indsæt URL fra clipboard kun når brugeren fokuserer feltet
+  urlInput.addEventListener('focus', () => {
+    if (urlInput.value) return;
+    navigator.clipboard?.readText?.().then(text => {
+      if (text?.startsWith('http') && !urlInput.value) urlInput.value = text;
+    }).catch(() => {});
+  }, { once: true });
 
   const setStatus = (html, type = 'info') => {
     status.style.display = 'block';
