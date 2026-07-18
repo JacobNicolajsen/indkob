@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path    = require('path');
+const crypto  = require('crypto');
 const app     = express();
 
 app.use(express.json());
@@ -15,6 +16,16 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Adgangskode på API'et — aktiveres ved at sætte APP_PASSWORD i .env
+const APP_PASSWORD = process.env.APP_PASSWORD || '';
+app.use('/api', (req, res, next) => {
+  if (!APP_PASSWORD) return next();
+  const given = Buffer.from(String(req.get('X-App-Key') || ''));
+  const want  = Buffer.from(APP_PASSWORD);
+  if (given.length === want.length && crypto.timingSafeEqual(given, want)) return next();
+  res.status(401).json({ error: 'Adgangskode påkrævet' });
+});
 
 app.use('/api/products',     require('./server/routes/products'));
 app.use('/api/recipes',      require('./server/routes/recipes'));

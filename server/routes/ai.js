@@ -2,6 +2,7 @@ const express   = require('express');
 const router    = express.Router();
 const db        = require('../db');
 const Anthropic = require('@anthropic-ai/sdk');
+const { assertPublicHttpUrl } = require('../urlGuard');
 
 const VALID_UNITS = ['stk','g','kg','ml','dl','L','tsk','spsk','fed','bundt','dåse','pose','pakke','portion','knsp','sk'];
 const VALID_SHOP  = ['Frugt & Grønt','Kød & Fisk','Mejeri & Æg','Brød & Bageri','Kolonial','Frost','Drikkevarer','Husholdning','Andet'];
@@ -29,6 +30,12 @@ router.post('/import-recipe', async (req, res) => {
   }
 
   // ── 1. Hent siden ────────────────────────────────────────────────
+  try {
+    await assertPublicHttpUrl(url);
+  } catch (e) {
+    return res.status(422).json({ error: e.message });
+  }
+
   let html;
   try {
     const r = await fetch(url, {
@@ -144,17 +151,25 @@ ${cleaned}`
 
   // ── 5. Opret opskriften ──────────────────────────────────────────
   try {
-    const result = db.prepare(
-      'INSERT INTO recipes (name, description, servings, category, image, source_url) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(name, desc, servings, category, image, url);
+    db.exec('BEGIN');
+    let recipeId;
+    try {
+      const result = db.prepare(
+        'INSERT INTO recipes (name, description, servings, category, image, source_url) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(name, desc, servings, category, image, url);
 
-    const recipeId = result.lastInsertRowid;
+      recipeId = result.lastInsertRowid;
 
-    const insertIng = db.prepare(
-      'INSERT INTO recipe_ingredients (recipe_id, product_id, amount, unit) VALUES (?, ?, ?, ?)'
-    );
-    for (const ing of ingredientRows) {
-      insertIng.run(recipeId, ing.product_id, ing.amount, ing.unit);
+      const insertIng = db.prepare(
+        'INSERT INTO recipe_ingredients (recipe_id, product_id, amount, unit) VALUES (?, ?, ?, ?)'
+      );
+      for (const ing of ingredientRows) {
+        insertIng.run(recipeId, ing.product_id, ing.amount, ing.unit);
+      }
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
     }
 
     res.json({

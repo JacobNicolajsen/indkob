@@ -1,5 +1,5 @@
 import { shoppinglist as api, products as productsApi } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
+import { openSheet, closeSheet, toast, setTopActions, printHtml, esc } from '../app.js';
 import { UNITS } from '../constants.js';
 
 const SHOP_CATEGORIES = [
@@ -26,7 +26,7 @@ export async function renderShoppinglist(container) {
   try {
     items = await api.list();
   } catch (e) {
-    container.innerHTML = `<div class="card" style="color:red">${e.message}</div>`;
+    container.innerHTML = `<div class="card" style="color:red">${esc(e.message)}</div>`;
     return;
   }
 
@@ -116,7 +116,7 @@ function buildShopItem(item, container) {
           const d   = new Date(s.date + 'T00:00:00');
           const day = DAY[d.getDay()];
           const dt  = d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' });
-          return `${s.recipe_name} · ${day} ${dt}`;
+          return esc(`${s.recipe_name} · ${day} ${dt}`);
         });
         sourcesHtml = `<span class="shop-sources">${labels.join(' &nbsp;·&nbsp; ')}</span>`;
       }
@@ -126,10 +126,10 @@ function buildShopItem(item, container) {
   el.innerHTML = `
     <div class="shop-check" title="Marker"></div>
     <div class="shop-name-wrap">
-      <span class="shop-name">${item.name}</span>
+      <span class="shop-name">${esc(item.name)}</span>
       ${sourcesHtml}
     </div>
-    ${amountText ? `<span class="shop-amount">${amountText}</span>` : ''}
+    ${amountText ? `<span class="shop-amount">${esc(amountText)}</span>` : ''}
     <button class="shop-delete" title="Fjern">🗑</button>
   `;
 
@@ -200,9 +200,9 @@ function openAddItemSheet(container) {
       matches = matches.slice(0, 6);
       sugg.innerHTML = matches.map(m =>
         `<div class="list-item" style="border-radius:8px;padding:10px 12px;font-size:0.9rem"
-              data-name="${m.name}" data-unit="${m.default_unit}" data-cat="${m.shop_category}">
-          ${CAT_ICONS[m.shop_category] || '📦'} ${m.name}
-          <span style="color:var(--ink-muted);font-size:0.8rem">${m.default_unit}</span>
+              data-name="${esc(m.name)}" data-unit="${esc(m.default_unit)}" data-cat="${esc(m.shop_category)}">
+          ${CAT_ICONS[m.shop_category] || '📦'} ${esc(m.name)}
+          <span style="color:var(--ink-muted);font-size:0.8rem">${esc(m.default_unit)}</span>
         </div>`
       ).join('');
 
@@ -318,8 +318,8 @@ function printShoppingList() {
         : (item.unit || '');
       return `<div class="item${item.checked ? ' done' : ''}">
         <span class="chk">${item.checked ? '☑' : '☐'}</span>
-        <span class="nm">${item.name}</span>
-        ${amt ? `<span class="am">${amt}</span>` : ''}
+        <span class="nm">${esc(item.name)}</span>
+        ${amt ? `<span class="am">${esc(amt)}</span>` : ''}
       </div>`;
     }).join('');
     return `<div class="cat">
@@ -377,8 +377,8 @@ async function openLibrarySheet(container) {
           <div class="list-item" style="gap:10px">
             <span>${CAT_ICONS[item.shop_category] || '📦'}</span>
             <div style="flex:1">
-              <div style="font-weight:500">${item.name}</div>
-              <div style="font-size:0.8rem;color:var(--ink-muted)">${item.shop_category}${item.unit ? ' · ' + item.unit : ''}</div>
+              <div style="font-weight:500">${esc(item.name)}</div>
+              <div style="font-size:0.8rem;color:var(--ink-muted)">${esc(item.shop_category)}${item.unit ? ' · ' + esc(item.unit) : ''}</div>
             </div>
             <button class="btn btn-sm btn-danger lib-del" data-id="${item.id}">✕</button>
           </div>`

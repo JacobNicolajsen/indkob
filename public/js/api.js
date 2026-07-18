@@ -1,13 +1,35 @@
 const BASE = `${new URL('.', document.baseURI).pathname}api`;
 
-async function req(method, path, body) {
+// Delt adgangskode (hvis serveren har APP_PASSWORD sat) — gemmes lokalt efter første login
+let appKey = localStorage.getItem('app_key') || '';
+let keyPrompt = null;
+
+function askForKey() {
+  if (!keyPrompt) {
+    keyPrompt = Promise.resolve().then(() => {
+      const pw = window.prompt('Adgangskode til Indkøbsassistenten:');
+      keyPrompt = null;
+      if (!pw) return false;
+      appKey = pw;
+      localStorage.setItem('app_key', pw);
+      return true;
+    });
+  }
+  return keyPrompt;
+}
+
+async function req(method, path, body, retried = false) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (appKey) opts.headers['X-App-Key'] = appKey;
   if (body !== undefined) opts.body = JSON.stringify(body);
   let res;
   try {
     res = await fetch(BASE + path, opts);
   } catch {
     throw new Error('Kan ikke nå serveren — er den startet? (npm start)');
+  }
+  if (res.status === 401 && !retried && await askForKey()) {
+    return req(method, path, body, true);
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));

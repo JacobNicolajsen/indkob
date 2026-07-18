@@ -1,4 +1,4 @@
-import { setTopActions, navigate } from '../app.js';
+import { setTopActions, navigate, esc } from '../app.js';
 import { settings as settingsApi, ics as icsApi } from '../api.js';
 
 export async function renderMore(container) {
@@ -31,7 +31,7 @@ export async function renderMore(container) {
       </div>
       <div style="display:flex;gap:8px">
         <input class="form-input" id="ics-url-input" type="url"
-          placeholder="https://…/kalender.ics" value="${icsUrl}"
+          placeholder="https://…/kalender.ics" value="${esc(icsUrl)}"
           style="flex:1;font-size:0.85rem">
         <button class="btn btn-primary" id="btn-ics-save">Gem</button>
       </div>

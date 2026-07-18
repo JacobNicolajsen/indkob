@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const { recalculateShoppingList } = require('../shoppingHelper');
 
 // GET /api/recipes?search=&category=
 router.get('/', (req, res) => {
@@ -100,6 +101,11 @@ router.put('/:id', (req, res) => {
     }
 
     db.exec('COMMIT');
+
+    // Opskriften kan indgå i madplanen — genberegn indkøbslisten
+    try { recalculateShoppingList(db); }
+    catch (e) { console.warn('Shopping recalc:', e.message); }
+
     res.json({ ok: true });
   } catch (e) {
     db.exec('ROLLBACK');
@@ -110,6 +116,11 @@ router.put('/:id', (req, res) => {
 // DELETE /api/recipes/:id
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM recipes WHERE id = ?').run(req.params.id);
+
+  // Sletning kaskaderer til madplanen — genberegn indkøbslisten
+  try { recalculateShoppingList(db); }
+  catch (e) { console.warn('Shopping recalc:', e.message); }
+
   res.json({ ok: true });
 });
 

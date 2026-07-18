@@ -1,9 +1,11 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const { assertPublicHttpUrl } = require('../urlGuard');
 
-// Simpel in-memory cache
+// Simpel in-memory cache — nøglet på URL så cachen ryddes når ics_url ændres
 let icsCache  = null;
+let cacheUrl  = null;
 let cacheTime = 0;
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutter
 
@@ -130,14 +132,16 @@ router.get('/', async (req, res) => {
 
   // Hent og cache ICS-feed
   const now = Date.now();
-  if (!icsCache || now - cacheTime > CACHE_TTL) {
+  if (!icsCache || url !== cacheUrl || now - cacheTime > CACHE_TTL) {
     try {
+      await assertPublicHttpUrl(url);
       const r = await fetch(url, {
         headers: { 'User-Agent': 'IndkobsAssistent/1.0' },
         signal:  AbortSignal.timeout(10000),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       icsCache  = parseIcs(await r.text());
+      cacheUrl  = url;
       cacheTime = now;
     } catch (e) {
       console.warn('ICS fetch fejl:', e.message);
@@ -159,6 +163,7 @@ router.get('/', async (req, res) => {
 // POST /api/ics/refresh — tving cache-refresh
 router.post('/refresh', (req, res) => {
   icsCache  = null;
+  cacheUrl  = null;
   cacheTime = 0;
   res.json({ ok: true });
 });

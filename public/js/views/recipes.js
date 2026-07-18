@@ -1,5 +1,5 @@
 import { recipes as api, ai } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
+import { openSheet, closeSheet, toast, setTopActions, esc, safeUrl } from '../app.js';
 import { openProductPicker } from './catalog.js';
 import { UNITS, RECIPE_CATEGORIES, CAT_ICONS, unitOptions, catOptions } from '../constants.js';
 
@@ -18,7 +18,7 @@ export async function renderRecipes(container) {
   searchBar.innerHTML = `
     <div class="search-bar">
       <span class="search-icon">🔍</span>
-      <input type="text" id="recipe-search" placeholder="Søg i opskrifter…" value="${currentSearch}" autocomplete="off">
+      <input type="text" id="recipe-search" placeholder="Søg i opskrifter…" value="${esc(currentSearch)}" autocomplete="off">
       ${currentSearch ? '<button id="clear-search" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--ink-muted)">✕</button>' : ''}
     </div>`;
   container.appendChild(searchBar);
@@ -32,7 +32,7 @@ export async function renderRecipes(container) {
     try {
       renderGrid(grid, await api.list(search ? { search } : {}), container);
     } catch (e) {
-      grid.innerHTML = `<div style="grid-column:1/-1;padding:16px;color:#9B2E1A">${e.message}</div>`;
+      grid.innerHTML = `<div style="grid-column:1/-1;padding:16px;color:#9B2E1A">${esc(e.message)}</div>`;
     }
   };
 
@@ -85,11 +85,11 @@ function renderGrid(grid, list, container) {
     const isEmoji = /^\p{Emoji}/u.test(emoji);
     card.innerHTML = `
       <div class="recipe-card-img">${isEmoji
-        ? emoji
-        : `<img src="${emoji}" style="width:100%;height:100%;object-fit:cover">`}</div>
+        ? esc(emoji)
+        : `<img src="${safeUrl(emoji)}" style="width:100%;height:100%;object-fit:cover">`}</div>
       <div class="recipe-card-body">
-        <div class="recipe-card-name">${r.name}</div>
-        <div class="recipe-card-meta">${r.category || 'Ingen kategori'} · ${r.servings} pers.</div>
+        <div class="recipe-card-name">${esc(r.name)}</div>
+        <div class="recipe-card-meta">${esc(r.category || 'Ingen kategori')} · ${esc(r.servings)} pers.</div>
       </div>`;
     card.addEventListener('click', () => openRecipeDetail(r.id, container));
     grid.appendChild(card);
@@ -106,17 +106,17 @@ async function openRecipeDetail(id, container) {
 
   frag.innerHTML = `
     <div style="text-align:center;font-size:4rem;padding:4px 0 8px">
-      ${isEmoji ? emoji : `<img src="${emoji}" style="width:100%;border-radius:12px;max-height:180px;object-fit:cover">`}
+      ${isEmoji ? esc(emoji) : `<img src="${safeUrl(emoji)}" style="width:100%;border-radius:12px;max-height:180px;object-fit:cover">`}
     </div>
     ${recipe.description
-      ? `<p style="color:var(--ink-muted);margin:0 0 14px;line-height:1.6;font-size:0.95rem">${recipe.description}</p>`
+      ? `<p style="color:var(--ink-muted);margin:0 0 14px;line-height:1.6;font-size:0.95rem">${esc(recipe.description)}</p>`
       : ''}
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-      <span class="badge badge-terra">${recipe.category || 'Ingen kategori'}</span>
-      <span class="badge badge-sage">👥 ${recipe.servings} pers.</span>
+      <span class="badge badge-terra">${esc(recipe.category || 'Ingen kategori')}</span>
+      <span class="badge badge-sage">👥 ${esc(recipe.servings)} pers.</span>
     </div>
-    ${recipe.source_url ? `
-      <a href="${recipe.source_url}" target="_blank" rel="noopener"
+    ${safeUrl(recipe.source_url) ? `
+      <a href="${safeUrl(recipe.source_url)}" target="_blank" rel="noopener"
          style="display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--terra);text-decoration:none;margin-bottom:14px;word-break:break-all">
         🔗 Originalopskrift
       </a>` : ''}
@@ -137,9 +137,9 @@ async function openRecipeDetail(id, container) {
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)';
       row.innerHTML = `
         <span style="font-size:1.1rem;width:24px;text-align:center">${CAT_ICONS[ing.shop_category] || '📦'}</span>
-        <span style="flex:1;font-size:0.93rem">${ing.name}</span>
+        <span style="flex:1;font-size:0.93rem">${esc(ing.name)}</span>
         <span style="font-size:0.85rem;color:var(--ink-muted);font-weight:500">
-          ${ing.amount != null ? ing.amount + ' ' + unit : unit}
+          ${esc(ing.amount != null ? ing.amount + ' ' + unit : unit)}
         </span>`;
       wrap.appendChild(row);
     }
@@ -225,14 +225,14 @@ function openAiImport(onDone) {
       const newProds = result.new_products?.length
         ? `<div class="ai-new-prods">
              <strong>${result.new_products.length} nye varer oprettet i kataloget:</strong>
-             <span>${result.new_products.join(', ')}</span>
+             <span>${esc(result.new_products.join(', '))}</span>
            </div>`
         : '';
 
       setStatus(`
         <div class="ai-success-card">
-          <div class="ai-success-title">✅ ${result.name}</div>
-          <div class="ai-success-meta">${result.ingredients_count} ingredienser importeret</div>
+          <div class="ai-success-title">✅ ${esc(result.name)}</div>
+          <div class="ai-success-meta">${esc(result.ingredients_count)} ingredienser importeret</div>
           ${newProds}
         </div>`, 'success');
 
@@ -243,7 +243,7 @@ function openAiImport(onDone) {
       toast(`"${result.name}" oprettet`);
       onDone();
     } catch (e) {
-      setStatus(`<div class="ai-error">⚠️ ${e.message}</div>`, 'error');
+      setStatus(`<div class="ai-error">⚠️ ${esc(e.message)}</div>`, 'error');
       goBtn.textContent = 'Prøv igen';
       goBtn.disabled = false;
     }
@@ -272,11 +272,11 @@ function openRecipeForm(recipe, onSave) {
   frag.innerHTML = `
     <div class="form-group">
       <label class="form-label">Navn *</label>
-      <input class="form-input" id="f-name" value="${recipe?.name || ''}" placeholder="fx Spaghetti Bolognese" autocomplete="off">
+      <input class="form-input" id="f-name" value="${esc(recipe?.name || '')}" placeholder="fx Spaghetti Bolognese" autocomplete="off">
     </div>
     <div class="form-group">
       <label class="form-label">Emoji / Billede-URL</label>
-      <input class="form-input" id="f-image" value="${recipe?.image || ''}" placeholder="🍝 eller https://…">
+      <input class="form-input" id="f-image" value="${esc(recipe?.image || '')}" placeholder="🍝 eller https://…">
     </div>
     <div style="display:flex;gap:10px">
       <div class="form-group" style="flex:1">
@@ -290,7 +290,7 @@ function openRecipeForm(recipe, onSave) {
     </div>
     <div class="form-group">
       <label class="form-label">Beskrivelse</label>
-      <textarea class="form-textarea" id="f-desc" placeholder="Kort beskrivelse…">${recipe?.description || ''}</textarea>
+      <textarea class="form-textarea" id="f-desc" placeholder="Kort beskrivelse…">${esc(recipe?.description || '')}</textarea>
     </div>
     <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600;margin-bottom:10px">Ingredienser</div>
     <div id="ing-rows"></div>
@@ -322,7 +322,7 @@ function openRecipeForm(recipe, onSave) {
 
       row.innerHTML = `
         <span style="font-size:1.1rem;width:24px;text-align:center;flex-shrink:0">${CAT_ICONS[ing.shop_category] || '📦'}</span>
-        <button class="ing-name-btn" data-idx="${idx}" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:var(--ink);padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ing.name}</button>
+        <button class="ing-name-btn" data-idx="${idx}" style="flex:2;text-align:left;background:none;border:none;cursor:pointer;font-size:0.9rem;font-weight:600;color:var(--ink);padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ing.name)}</button>
         <input type="number" step="any" min="0" class="form-input ing-amount" data-idx="${idx}"
           value="${ing.amount ?? ''}" placeholder="Mgl."
           style="flex:1;min-width:0;padding:8px 8px;font-size:0.88rem">

@@ -1,5 +1,5 @@
 import { products as api } from '../api.js';
-import { openSheet, closeSheet, openSheet2, closeSheet2, toast, setTopActions } from '../app.js';
+import { openSheet, closeSheet, openSheet2, closeSheet2, toast, setTopActions, esc } from '../app.js';
 import { UNITS, SHOP_CATEGORIES, CAT_ICONS, unitOptions, catOptions } from '../constants.js';
 
 export async function renderCatalog(container) {
@@ -20,7 +20,7 @@ export async function renderCatalog(container) {
     try {
       allProducts = await api.list(search ? { search } : {});
     } catch (e) {
-      listEl.innerHTML = `<div style="padding:16px;color:#9B2E1A">${e.message}</div>`;
+      listEl.innerHTML = `<div style="padding:16px;color:#9B2E1A">${esc(e.message)}</div>`;
       return;
     }
     renderList(allProducts);
@@ -62,11 +62,11 @@ export async function renderCatalog(container) {
         row.innerHTML = `
           <span style="font-size:1.4rem;width:30px;text-align:center">${CAT_ICONS[p.shop_category] || '📦'}</span>
           <div style="flex:1">
-            <div style="font-weight:600;font-size:0.95rem">${p.name}</div>
-            <div style="font-size:0.72rem;color:var(--ink-muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em">${p.default_unit}</div>
+            <div style="font-weight:600;font-size:0.95rem">${esc(p.name)}</div>
+            <div style="font-size:0.72rem;color:var(--ink-muted);font-weight:500;text-transform:uppercase;letter-spacing:.04em">${esc(p.default_unit)}</div>
           </div>
           <span style="font-size:0.7rem;color:var(--ink-muted);padding:3px 8px;background:var(--bg);border-radius:6px">
-            ${UNITS.find(u => u.value === p.default_unit)?.label || p.default_unit}
+            ${esc(UNITS.find(u => u.value === p.default_unit)?.label || p.default_unit)}
           </span>
         `;
         row.addEventListener('click', () => openProductForm(p, () => load()));
@@ -107,7 +107,7 @@ function openProductForm(product, onSave) {
   frag.innerHTML = `
     <div class="form-group">
       <label class="form-label">Produktnavn *</label>
-      <input class="form-input" id="p-name" value="${product?.name || ''}" placeholder="fx Hakkede tomater" autocomplete="off">
+      <input class="form-input" id="p-name" value="${esc(product?.name || '')}" placeholder="fx Hakkede tomater" autocomplete="off">
     </div>
     <div class="form-group">
       <label class="form-label">Standardenhed</label>
@@ -210,8 +210,8 @@ export async function openProductPicker(onSelect, currentProductId) {
       row.innerHTML = `
         <span style="font-size:1.3rem;width:28px;text-align:center">${CAT_ICONS[p.shop_category] || '📦'}</span>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:0.95rem">${p.name}</div>
-          <div style="font-size:0.72rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em">${p.shop_category}</div>
+          <div style="font-weight:600;font-size:0.95rem">${esc(p.name)}</div>
+          <div style="font-size:0.72rem;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em">${esc(p.shop_category)}</div>
         </div>
         ${p.id === currentProductId ? '<span style="color:var(--sage);font-size:1.1rem">✓</span>' : ''}
       `;

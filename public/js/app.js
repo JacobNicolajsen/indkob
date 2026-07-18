@@ -7,6 +7,26 @@ import { renderStaples }      from './views/staples.js';
 
 export const state = { view: 'mealplan' };
 
+// ── HTML-escaping — brug ved AL interpolation af data i innerHTML ──
+
+export function esc(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Kun http/https-links må bruges i href/src — alt andet giver '' */
+export function safeUrl(v) {
+  try {
+    const u = new URL(String(v ?? ''), document.baseURI);
+    if (u.protocol === 'http:' || u.protocol === 'https:') return esc(u.href);
+  } catch { /* ugyldig URL */ }
+  return '';
+}
+
 // Katalog er sub-side under "Mere" — ingen egen nav-knap
 const views = {
   mealplan:     { title: 'Madplan',     render: renderMealplan,     navKey: 'mealplan' },
@@ -54,7 +74,7 @@ export function openSheet(title, content, onClose) {
     <div class="overlay" id="overlay">
       <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">${title}</div>
+        <div class="sheet-title">${esc(title)}</div>
         <div id="sheet-body" style="padding:0 20px"></div>
       </div>
     </div>`;
@@ -80,7 +100,7 @@ export function openSheet2(title, content, onClose) {
     <div class="overlay" id="overlay2">
       <div class="sheet">
         <div class="sheet-handle"></div>
-        <div class="sheet-title">${title}</div>
+        <div class="sheet-title">${esc(title)}</div>
         <div id="sheet-body2" style="padding:0 20px"></div>
       </div>
     </div>`;

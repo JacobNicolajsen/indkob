@@ -1,5 +1,5 @@
 import { staples as api, products as productsApi } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions } from '../app.js';
+import { openSheet, closeSheet, toast, setTopActions, esc } from '../app.js';
 
 const SHOP_CATEGORIES = [
   'Frugt & Grønt', 'Kød & Fisk', 'Mejeri & Æg', 'Brød & Bageri',
@@ -38,7 +38,7 @@ export async function renderStaples(container) {
   try {
     items = await api.list();
   } catch (e) {
-    container.innerHTML = `<div class="card" style="color:red">${e.message}</div>`;
+    container.innerHTML = `<div class="card" style="color:red">${esc(e.message)}</div>`;
     return;
   }
 
@@ -82,8 +82,8 @@ function renderList(container) {
         row.innerHTML = `
           <span style="font-size:1.2rem;color:var(--sage)">🛒</span>
           <div style="flex:1">
-            <div style="font-weight:500">${item.name}</div>
-            ${amt ? `<div style="font-size:0.8rem;color:var(--ink-muted)">${amt}</div>` : ''}
+            <div style="font-weight:500">${esc(item.name)}</div>
+            ${amt ? `<div style="font-size:0.8rem;color:var(--ink-muted)">${esc(amt)}</div>` : ''}
           </div>
           <button class="btn btn-sm btn-danger staple-del" data-id="${item.id}" title="Fjern"
             style="display:${editMode ? 'inline-flex' : 'none'}">✕</button>`;
@@ -165,9 +165,9 @@ function openAddSheet(container) {
       matches = matches.slice(0, 6);
       sugg.innerHTML = matches.map(m =>
         `<div class="list-item" style="border-radius:8px;padding:10px 12px;font-size:0.9rem"
-              data-name="${m.name}" data-unit="${m.default_unit}" data-cat="${m.shop_category}">
-          ${CAT_ICONS[m.shop_category] || '📦'} ${m.name}
-          <span style="color:var(--ink-muted);font-size:0.8rem">${m.default_unit}</span>
+              data-name="${esc(m.name)}" data-unit="${esc(m.default_unit)}" data-cat="${esc(m.shop_category)}">
+          ${CAT_ICONS[m.shop_category] || '📦'} ${esc(m.name)}
+          <span style="color:var(--ink-muted);font-size:0.8rem">${esc(m.default_unit)}</span>
         </div>`
       ).join('');
 

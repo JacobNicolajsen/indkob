@@ -1,5 +1,5 @@
 import { mealplan, recipes as recipesApi, notes as notesApi, ics as icsApi } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions, printHtml } from '../app.js';
+import { openSheet, closeSheet, toast, setTopActions, printHtml, esc } from '../app.js';
 
 function autoResizeTextarea(el) {
   el.style.height = 'auto';
@@ -69,7 +69,7 @@ export async function renderMealplan(container) {
   try {
     entries = await mealplan.list(dateStr(sunday), dateStr(saturday));
   } catch (e) {
-    container.innerHTML = `<div class="card" style="color:#9B2E1A">${e.message}</div>`;
+    container.innerHTML = `<div class="card" style="color:#9B2E1A">${esc(e.message)}</div>`;
     return;
   }
 
@@ -180,7 +180,7 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
   icsApi.events(ds).then(r => {
     if (r.events?.length) {
       calEl.innerHTML = r.events.map(e =>
-        `<span class="day-cal-event">${e.time ? e.time + ' ' : ''}${e.summary}</span>`
+        `<span class="day-cal-event">${esc(e.time ? e.time + ' ' : '')}${esc(e.summary)}</span>`
       ).join('');
     }
   }).catch(() => {});
@@ -213,7 +213,7 @@ function buildMealSlot(ds, mt, entry, expandedDays, container) {
   slot.className = 'meal-slot';
   slot.innerHTML = `
     <span class="meal-type-label">${mt.label}</span>
-    <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? entry.recipe_name : 'Tilføj ret…'}</span>
+    <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? esc(entry.recipe_name) : 'Tilføj ret…'}</span>
     ${entry ? `
       <div class="servings-stepper" title="Antal portioner">
         <button class="step-btn step-minus" aria-label="Færre portioner">−</button>
@@ -298,10 +298,10 @@ async function openRecipePicker(date, mealType, currentId, onDone) {
         const row = document.createElement('div');
         row.className = 'list-item';
         row.innerHTML = `
-          <span style="font-size:1.5rem;width:32px;text-align:center">${r.image || '🍽️'}</span>
+          <span style="font-size:1.5rem;width:32px;text-align:center">${esc(r.image || '🍽️')}</span>
           <div style="flex:1">
-            <div style="font-family:var(--serif);font-size:1rem;font-weight:600">${r.name}</div>
-            <div style="font-size:0.75rem;color:var(--ink-muted)">${r.category || ''}${r.category ? ' · ' : ''}${r.servings} pers.</div>
+            <div style="font-family:var(--serif);font-size:1rem;font-weight:600">${esc(r.name)}</div>
+            <div style="font-size:0.75rem;color:var(--ink-muted)">${esc(r.category || '')}${r.category ? ' · ' : ''}${esc(r.servings)} pers.</div>
           </div>
           ${r.id == currentId ? '<span style="color:var(--sage);font-size:1.1rem">✓</span>' : ''}
         `;
@@ -410,21 +410,21 @@ async function execMealplanPrint(from, to, entries) {
       if (!e) return '';
       return `<div class="meal-row">
         <span class="mt">${MEAL_LABEL[mt]}</span>
-        <span class="mn">${e.recipe_name}</span>
-        <span class="ms">${e.servings} pers.</span>
+        <span class="mn">${esc(e.recipe_name)}</span>
+        <span class="ms">${esc(e.servings)} pers.</span>
       </div>`;
     }).join('');
 
     const calEvents = icsByDate[ds];
     const calHtml = calEvents.length
       ? `<div class="cal-row">${calEvents.map(ev =>
-          `<span class="cal-chip">${ev.time ? ev.time + ' ' : ''}${ev.summary}</span>`
+          `<span class="cal-chip">${esc(ev.time ? ev.time + ' ' : '')}${esc(ev.summary)}</span>`
         ).join('')}</div>`
       : '';
 
     const note = notesByDate[ds];
     const noteHtml = note
-      ? `<div class="note-row">${note.replace(/\n/g, '<br>')}</div>`
+      ? `<div class="note-row">${esc(note).replace(/\n/g, '<br>')}</div>`
       : '';
 
     const extra = calHtml || noteHtml

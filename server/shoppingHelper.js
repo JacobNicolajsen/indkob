@@ -8,11 +8,11 @@
  * - Rører ikke custom-varer (source = 'custom')
  */
 function recalculateShoppingList(db) {
-  // Husk hvilke produktnavne der allerede er afkrydset
-  const checkedNames = new Set(
+  // Husk hvilke varer (navn + enhed) der allerede er afkrydset
+  const checkedKeys = new Set(
     db.prepare(
-      "SELECT LOWER(name) as n FROM shopping_list WHERE source='recipe' AND checked=1"
-    ).all().map(r => r.n)
+      "SELECT LOWER(name) || '||' || unit AS k FROM shopping_list WHERE source='recipe' AND checked=1"
+    ).all().map(r => r.k)
   );
 
   // Kun madplan fra dags dato og frem
@@ -76,7 +76,7 @@ function recalculateShoppingList(db) {
     `);
 
     for (const item of Object.values(agg)) {
-      const checked = checkedNames.has(item.name.toLowerCase()) ? 1 : 0;
+      const checked = checkedKeys.has(`${item.name.toLowerCase()}||${item.unit}`) ? 1 : 0;
       insert.run(item.name, item.amount, item.unit, item.shop_category, checked,
         JSON.stringify(item.sources || []));
     }
