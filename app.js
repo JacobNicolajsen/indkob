@@ -4,7 +4,7 @@ const path    = require('path');
 const crypto  = require('crypto');
 const app     = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '8mb' })); // fotos til AI-import og opskriftsbilleder sendes som base64
 
 // Strip mount prefix — LiteSpeed sends full path including /indkob to Node
 app.use((req, res, next) => {

@@ -43,7 +43,7 @@ export async function renderMore(container) {
         <span style="font-size:1.3rem">🥘</span>
         <div>
           <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600">Indkøbsassistent</div>
-          <div style="font-size:0.78rem;color:var(--ink-muted)">Version 1.2.0</div>
+          <div style="font-size:0.78rem;color:var(--ink-muted)">Version 1.3.0</div>
         </div>
       </div>
       <div class="list-item" style="cursor:default">

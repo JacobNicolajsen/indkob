@@ -1,7 +1,12 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const fs      = require('fs');
+const path    = require('path');
+const crypto  = require('crypto');
 const { recalculateShoppingList } = require('../shoppingHelper');
+
+const uploadDir = path.join(__dirname, '../../public/uploads');
 
 // GET /api/recipes?search=&category=
 router.get('/', (req, res) => {
@@ -28,6 +33,34 @@ router.get('/categories/list', (req, res) => {
     "SELECT DISTINCT category FROM recipes WHERE category != '' ORDER BY category"
   ).all();
   res.json(rows.map(r => r.category));
+});
+
+// GET /api/recipes/stats/usage — hvor ofte hver ret har været på madplanen
+router.get('/stats/usage', (req, res) => {
+  res.json(db.prepare(`
+    SELECT recipe_id, COUNT(*) AS times, MAX(date) AS last_used
+    FROM meal_plan GROUP BY recipe_id
+  `).all());
+});
+
+// POST /api/recipes/upload-image  { image_base64, media_type }
+// Gemmer et opskriftsbillede (klienten har allerede skaleret det ned)
+router.post('/upload-image', (req, res) => {
+  const { image_base64, media_type } = req.body;
+  const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[media_type];
+  if (!ext) return res.status(400).json({ error: 'Ugyldigt billedformat' });
+  if (!image_base64 || typeof image_base64 !== 'string' || image_base64.length > 8_000_000) {
+    return res.status(400).json({ error: 'Billedet mangler eller er for stort' });
+  }
+
+  try {
+    fs.mkdirSync(uploadDir, { recursive: true });
+    const name = 'r_' + crypto.randomBytes(8).toString('hex') + '.' + ext;
+    fs.writeFileSync(path.join(uploadDir, name), Buffer.from(image_base64, 'base64'));
+    res.status(201).json({ url: 'uploads/' + name });
+  } catch (e) {
+    res.status(500).json({ error: 'Kunne ikke gemme billedet: ' + e.message });
+  }
 });
 
 // GET /api/recipes/:id  — inkl. ingredienser med produkt-info

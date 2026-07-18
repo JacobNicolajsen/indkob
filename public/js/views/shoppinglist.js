@@ -1,4 +1,4 @@
-import { shoppinglist as api, products as productsApi } from '../api.js';
+import { shoppinglist as api, products as productsApi, settings as settingsApi, ai } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions, printHtml, esc } from '../app.js';
 import { UNITS } from '../constants.js';
 
@@ -14,6 +14,14 @@ const CAT_ICONS = {
 };
 
 let items = [];
+let categoryOrder = null; // brugerdefineret butik-rækkefølge (fra settings)
+
+/** Kategorier i brugerens rækkefølge; nye kategorier havner bagerst */
+function orderedCategories() {
+  if (!categoryOrder) return SHOP_CATEGORIES;
+  return [...categoryOrder.filter(c => SHOP_CATEGORIES.includes(c)),
+          ...SHOP_CATEGORIES.filter(c => !categoryOrder.includes(c))];
+}
 
 export async function renderShoppinglist(container) {
   container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ink-muted)">Henter indkøbsliste…</div>';
@@ -29,6 +37,12 @@ export async function renderShoppinglist(container) {
     container.innerHTML = `<div class="card" style="color:red">${esc(e.message)}</div>`;
     return;
   }
+
+  // Hent butik-rækkefølge (én gang pr. session er nok, men billigt at opdatere)
+  try {
+    const s = await settingsApi.getAll();
+    categoryOrder = s.category_order ? JSON.parse(s.category_order) : null;
+  } catch { /* behold default */ }
 
   renderList(container);
 
@@ -65,7 +79,7 @@ function renderList(container) {
     summary.textContent = `${unchecked} af ${items.length} varer mangler`;
     container.appendChild(summary);
 
-    for (const cat of SHOP_CATEGORIES) {
+    for (const cat of orderedCategories()) {
       if (!groups[cat]) continue;
       const section = document.createElement('div');
       section.innerHTML = `<div class="section-header">${CAT_ICONS[cat] || '📦'} ${cat}</div>`;
@@ -181,10 +195,47 @@ function openAddItemSheet(container) {
       <select class="form-select" id="item-category">${catOptions}</select>
     </div>
     <button class="btn btn-primary btn-full" id="btn-add-item">Tilføj vare</button>
+    <button class="btn btn-outline btn-sm btn-full" id="btn-quick-toggle" style="margin-top:10px">
+      ✨ Skriv flere varer på én gang
+    </button>
+    <div id="quick-wrap" style="display:none;margin-top:10px">
+      <textarea class="form-textarea" id="quick-text" rows="3"
+        placeholder="fx 2 L mælk, rugbrød og 400 g hakket oksekød"></textarea>
+      <button class="btn btn-primary btn-full" id="btn-quick-go" style="margin-top:8px">Tilføj varer</button>
+      <div id="quick-status" style="margin-top:8px;font-size:0.85rem;color:var(--ink-muted)"></div>
+    </div>
     <div style="height:12px"></div>
   `;
 
   openSheet('Tilføj vare', frag);
+
+  // ── AI hurtig-tilføj: fritekst → varer ──────────────────────────
+  frag.querySelector('#btn-quick-toggle').addEventListener('click', () => {
+    const wrap = frag.querySelector('#quick-wrap');
+    wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+    if (wrap.style.display === 'block') frag.querySelector('#quick-text').focus();
+  });
+
+  frag.querySelector('#btn-quick-go').addEventListener('click', async () => {
+    const text = frag.querySelector('#quick-text').value.trim();
+    if (!text) { toast('Skriv hvad du mangler'); return; }
+
+    const goBtn  = frag.querySelector('#btn-quick-go');
+    const status = frag.querySelector('#quick-status');
+    goBtn.disabled = true;
+    status.textContent = 'Claude læser din tekst…';
+
+    try {
+      const { items: parsed } = await ai.parseItems(text);
+      for (const it of parsed) await api.addItem(it);
+      closeSheet();
+      toast(`${parsed.length} varer tilføjet`);
+      renderShoppinglist(container);
+    } catch (e) {
+      status.textContent = '⚠️ ' + e.message;
+      goBtn.disabled = false;
+    }
+  });
 
   // Auto-komplet fra produktkatalog
   let suggestTimeout;
@@ -250,6 +301,20 @@ function showMenu(container) {
   const frag = document.createElement('div');
   frag.innerHTML = `
     <div style="padding-bottom:8px">
+      <div class="list-item" id="m-share">
+        <span style="font-size:1.3rem">📤</span>
+        <div>
+          <div style="font-weight:600">Del liste</div>
+          <div style="font-size:0.8rem;color:var(--ink-muted)">Send som tekst til fx Beskeder</div>
+        </div>
+      </div>
+      <div class="list-item" id="m-order">
+        <span style="font-size:1.3rem">🔀</span>
+        <div>
+          <div style="font-weight:600">Butik-rækkefølge</div>
+          <div style="font-size:0.8rem;color:var(--ink-muted)">Sortér kategorier efter din rute i butikken</div>
+        </div>
+      </div>
       <div class="list-item" id="m-clear-checked">
         <span style="font-size:1.3rem">✓</span>
         <div>
@@ -276,6 +341,16 @@ function showMenu(container) {
 
   openSheet('Indkøbsliste — muligheder', frag);
 
+  frag.querySelector('#m-share').addEventListener('click', async () => {
+    closeSheet();
+    await shareList();
+  });
+
+  frag.querySelector('#m-order').addEventListener('click', () => {
+    closeSheet();
+    openOrderSheet(container);
+  });
+
   frag.querySelector('#m-clear-checked').addEventListener('click', async () => {
     await api.clear(true);
     items = items.filter(i => !i.checked);
@@ -299,6 +374,87 @@ function showMenu(container) {
   });
 }
 
+// ── Del liste som tekst (Web Share API med clipboard-fallback) ────
+async function shareList() {
+  const unchecked = items.filter(i => !i.checked);
+  if (unchecked.length === 0) { toast('Ingen varer at dele'); return; }
+
+  const groups = {};
+  for (const item of unchecked) {
+    const cat = item.shop_category || 'Andet';
+    (groups[cat] ||= []).push(item);
+  }
+
+  const lines = [`🛒 Indkøbsliste ${new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'numeric' })}`];
+  for (const cat of orderedCategories()) {
+    if (!groups[cat]) continue;
+    lines.push('', `${CAT_ICONS[cat] || '📦'} ${cat}:`);
+    for (const item of groups[cat]) {
+      const amt = item.amount ? ` — ${item.amount} ${item.unit || ''}`.trimEnd() : (item.unit ? ` — ${item.unit}` : '');
+      lines.push(`• ${item.name}${amt}`);
+    }
+  }
+  const text = lines.join('\n');
+
+  if (navigator.share) {
+    try { await navigator.share({ text }); return; }
+    catch (e) { if (e.name === 'AbortError') return; /* ellers fallback */ }
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Listen er kopieret til udklipsholderen');
+  } catch {
+    toast('Kunne ikke dele listen');
+  }
+}
+
+// ── Butik-rækkefølge: sortér kategorier med ▲▼ ────────────────────
+function openOrderSheet(container) {
+  const order = [...orderedCategories()];
+  const frag  = document.createElement('div');
+
+  const save = async () => {
+    categoryOrder = [...order];
+    try { await settingsApi.set('category_order', JSON.stringify(order)); }
+    catch (e) { toast('Kunne ikke gemme rækkefølgen: ' + e.message); }
+  };
+
+  const renderRows = () => {
+    const list = frag.querySelector('#order-list');
+    list.innerHTML = '';
+    order.forEach((cat, idx) => {
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      row.style.cursor = 'default';
+      row.innerHTML = `
+        <span style="font-size:1.2rem;width:26px;text-align:center">${CAT_ICONS[cat] || '📦'}</span>
+        <span style="flex:1;font-weight:500">${esc(cat)}</span>
+        <button class="btn btn-sm btn-outline ord-up"   ${idx === 0 ? 'disabled' : ''} style="padding:4px 10px">▲</button>
+        <button class="btn btn-sm btn-outline ord-down" ${idx === order.length - 1 ? 'disabled' : ''} style="padding:4px 10px">▼</button>`;
+
+      row.querySelector('.ord-up').addEventListener('click', async () => {
+        [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]];
+        renderRows(); await save();
+      });
+      row.querySelector('.ord-down').addEventListener('click', async () => {
+        [order[idx + 1], order[idx]] = [order[idx], order[idx + 1]];
+        renderRows(); await save();
+      });
+      list.appendChild(row);
+    });
+  };
+
+  frag.innerHTML = `
+    <p style="font-size:0.85rem;color:var(--ink-muted);margin-bottom:12px;line-height:1.5">
+      Flyt kategorierne så de matcher din rute gennem butikken. Rækkefølgen bruges i listen og ved print.
+    </p>
+    <div id="order-list" style="background:var(--bg);border-radius:12px;overflow:hidden;margin-bottom:12px"></div>
+    <div style="height:8px"></div>`;
+
+  openSheet('Butik-rækkefølge', frag, () => renderList(container));
+  renderRows();
+}
+
 function printShoppingList() {
   if (items.length === 0) { toast('Indkøbslisten er tom'); return; }
 
@@ -309,7 +465,7 @@ function printShoppingList() {
     groups[cat].push(item);
   }
 
-  const activeCats = SHOP_CATEGORIES.filter(c => groups[c]);
+  const activeCats = orderedCategories().filter(c => groups[c]);
 
   const makeCatHtml = cat => {
     const rowsHtml = groups[cat].map(item => {

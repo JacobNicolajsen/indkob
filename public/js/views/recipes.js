@@ -6,6 +6,36 @@ import { UNITS, RECIPE_CATEGORIES, CAT_ICONS, unitOptions, catOptions } from '..
 let searchTimeout = null;
 let currentSearch = '';
 
+/**
+ * Læser en billedfil og skalerer den ned client-side (canvas → JPEG),
+ * så upload og AI-analyse ikke sender kæmpe filer.
+ * Returnerer { base64, media_type }.
+ */
+export async function fileToResizedImage(file, maxDim = 1400, quality = 0.82) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve(r.result);
+    r.onerror = () => reject(new Error('Kunne ikke læse filen'));
+    r.readAsDataURL(file);
+  });
+
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload  = () => resolve(i);
+    i.onerror = () => reject(new Error('Ugyldig billedfil'));
+    i.src = dataUrl;
+  });
+
+  const scale  = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const jpeg = canvas.toDataURL('image/jpeg', quality);
+  return { base64: jpeg.split(',')[1], media_type: 'image/jpeg' };
+}
+
 export async function renderRecipes(container) {
   setTopActions(`
     <button class="top-action" id="btn-ai-import" title="Importer fra link">✨</button>
@@ -100,6 +130,13 @@ async function openRecipeDetail(id, container) {
   let recipe;
   try { recipe = await api.get(id); } catch (e) { toast(e.message); return; }
 
+  // Hvor ofte har retten været på madplanen?
+  let timesCooked = 0;
+  try {
+    const stats = await api.stats();
+    timesCooked = stats.find(s => s.recipe_id === recipe.id)?.times || 0;
+  } catch { /* badge udelades */ }
+
   const frag  = document.createElement('div');
   const emoji = recipe.image || '🍽️';
   const isEmoji = /^\p{Emoji}/u.test(emoji);
@@ -114,6 +151,7 @@ async function openRecipeDetail(id, container) {
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <span class="badge badge-terra">${esc(recipe.category || 'Ingen kategori')}</span>
       <span class="badge badge-sage">👥 ${esc(recipe.servings)} pers.</span>
+      ${timesCooked > 0 ? `<span class="badge badge-sage">🍳 Lavet ${timesCooked} gang${timesCooked === 1 ? '' : 'e'}</span>` : ''}
     </div>
     ${safeUrl(recipe.source_url) ? `
       <a href="${safeUrl(recipe.source_url)}" target="_blank" rel="noopener"
@@ -183,6 +221,15 @@ function openAiImport(onDone) {
     <button class="btn btn-primary btn-full" id="btn-ai-go">
       Importer opskrift
     </button>
+    <div style="display:flex;align-items:center;gap:10px;margin:14px 0 10px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:0.8rem;color:var(--ink-muted)">eller</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <button class="btn btn-outline btn-full" id="btn-ai-photo">
+      📷 Importer fra foto
+    </button>
+    <input type="file" id="ai-photo-file" accept="image/*" style="display:none">
     <div id="ai-status" style="display:none"></div>
     <div style="height:8px"></div>
   `;
@@ -207,46 +254,73 @@ function openAiImport(onDone) {
     status.innerHTML = html;
   };
 
+  const photoBtn  = frag.querySelector('#btn-ai-photo');
+  const photoFile = frag.querySelector('#ai-photo-file');
+
+  const setLoading = (msg) => setStatus(`
+    <div class="ai-loading">
+      <span class="ai-spinner"></span>
+      <span>${esc(msg)}</span>
+    </div>`, 'info');
+
+  const showSuccess = (result) => {
+    const newProds = result.new_products?.length
+      ? `<div class="ai-new-prods">
+           <strong>${result.new_products.length} nye varer oprettet i kataloget:</strong>
+           <span>${esc(result.new_products.join(', '))}</span>
+         </div>`
+      : '';
+
+    setStatus(`
+      <div class="ai-success-card">
+        <div class="ai-success-title">✅ ${esc(result.name)}</div>
+        <div class="ai-success-meta">${esc(result.ingredients_count)} ingredienser importeret</div>
+        ${newProds}
+      </div>`, 'success');
+
+    toast(`"${result.name}" oprettet`);
+    onDone();
+  };
+
   goBtn.addEventListener('click', async () => {
     const url = urlInput.value.trim();
     if (!url.startsWith('http')) { toast('Indsæt et gyldigt link (starter med http)'); return; }
 
     goBtn.disabled = true;
     goBtn.textContent = 'Analyserer…';
-    setStatus(`
-      <div class="ai-loading">
-        <span class="ai-spinner"></span>
-        <span>Claude læser opskriften — det tager 10–20 sekunder…</span>
-      </div>`, 'info');
+    setLoading('Claude læser opskriften — det tager 10–20 sekunder…');
 
     try {
-      const result = await ai.importRecipe(url);
-
-      const newProds = result.new_products?.length
-        ? `<div class="ai-new-prods">
-             <strong>${result.new_products.length} nye varer oprettet i kataloget:</strong>
-             <span>${esc(result.new_products.join(', '))}</span>
-           </div>`
-        : '';
-
-      setStatus(`
-        <div class="ai-success-card">
-          <div class="ai-success-title">✅ ${esc(result.name)}</div>
-          <div class="ai-success-meta">${esc(result.ingredients_count)} ingredienser importeret</div>
-          ${newProds}
-        </div>`, 'success');
-
+      showSuccess(await ai.importRecipe(url));
       goBtn.textContent = 'Importer endnu en';
-      goBtn.disabled = false;
       urlInput.value = '';
-
-      toast(`"${result.name}" oprettet`);
-      onDone();
     } catch (e) {
       setStatus(`<div class="ai-error">⚠️ ${esc(e.message)}</div>`, 'error');
       goBtn.textContent = 'Prøv igen';
-      goBtn.disabled = false;
     }
+    goBtn.disabled = false;
+  });
+
+  // ── Foto-import: kogebogsside eller håndskrevet opskrift ────────
+  photoBtn.addEventListener('click', () => photoFile.click());
+
+  photoFile.addEventListener('change', async () => {
+    const file = photoFile.files?.[0];
+    if (!file) return;
+    photoFile.value = '';
+
+    photoBtn.disabled = true;
+    photoBtn.textContent = 'Analyserer foto…';
+    setLoading('Claude læser billedet — det tager 10–20 sekunder…');
+
+    try {
+      const { base64, media_type } = await fileToResizedImage(file, 1600);
+      showSuccess(await ai.importRecipePhoto(base64, media_type));
+    } catch (e) {
+      setStatus(`<div class="ai-error">⚠️ ${esc(e.message)}</div>`, 'error');
+    }
+    photoBtn.disabled = false;
+    photoBtn.textContent = '📷 Importer fra foto';
   });
 }
 
@@ -275,8 +349,12 @@ function openRecipeForm(recipe, onSave) {
       <input class="form-input" id="f-name" value="${esc(recipe?.name || '')}" placeholder="fx Spaghetti Bolognese" autocomplete="off">
     </div>
     <div class="form-group">
-      <label class="form-label">Emoji / Billede-URL</label>
-      <input class="form-input" id="f-image" value="${esc(recipe?.image || '')}" placeholder="🍝 eller https://…">
+      <label class="form-label">Emoji / Billede</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-input" id="f-image" value="${esc(recipe?.image || '')}" placeholder="🍝 eller https://…" style="flex:1">
+        <button class="btn btn-outline" id="btn-upload-img" title="Upload foto" style="padding:0 14px">📷</button>
+        <input type="file" id="f-image-file" accept="image/*" style="display:none">
+      </div>
     </div>
     <div style="display:flex;gap:10px">
       <div class="form-group" style="flex:1">
@@ -303,6 +381,31 @@ function openRecipeForm(recipe, onSave) {
     <div style="height:12px"></div>`;
 
   openSheet(isEdit ? 'Rediger opskrift' : 'Ny opskrift', frag);
+
+  // ── Upload foto til opskriften ──────────────────────────────────
+  const imgFile = frag.querySelector('#f-image-file');
+  frag.querySelector('#btn-upload-img').addEventListener('click', e => {
+    e.preventDefault();
+    imgFile.click();
+  });
+  imgFile.addEventListener('change', async () => {
+    const file = imgFile.files?.[0];
+    if (!file) return;
+    imgFile.value = '';
+    const btn = frag.querySelector('#btn-upload-img');
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const { base64, media_type } = await fileToResizedImage(file, 1200);
+      const { url } = await api.uploadImage(base64, media_type);
+      frag.querySelector('#f-image').value = url;
+      toast('Billede uploadet');
+    } catch (e) {
+      toast('Fejl: ' + e.message);
+    }
+    btn.disabled = false;
+    btn.textContent = '📷';
+  });
 
   const rowsEl = frag.querySelector('#ing-rows');
 

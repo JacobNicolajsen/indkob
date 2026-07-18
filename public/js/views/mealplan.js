@@ -1,4 +1,4 @@
-import { mealplan, recipes as recipesApi, notes as notesApi, ics as icsApi } from '../api.js';
+import { mealplan, recipes as recipesApi, notes as notesApi, ics as icsApi, ai } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions, printHtml, esc } from '../app.js';
 
 function autoResizeTextarea(el) {
@@ -59,7 +59,10 @@ function saveExpanded(set) {
 export async function renderMealplan(container) {
   container.innerHTML = '<div style="padding:32px;text-align:center;color:var(--ink-muted);font-family:var(--serif);font-style:italic;font-size:1.1rem">Henter madplan…</div>';
 
-  setTopActions(`<button class="top-action" id="btn-mp-print" title="Print madplan">🖨️</button>`);
+  setTopActions(`
+    <button class="top-action" id="btn-mp-suggest" title="Foreslå aftensmad">✨</button>
+    <button class="top-action" id="btn-mp-print" title="Print madplan">🖨️</button>
+  `);
 
   const sunday   = getSunday(weekOffset);
   const saturday = new Date(sunday);
@@ -130,6 +133,116 @@ export async function renderMealplan(container) {
   document.getElementById('btn-mp-print')?.addEventListener('click', () => {
     openMealplanPrintSheet(sunday, saturday);
   });
+
+  document.getElementById('btn-mp-suggest')?.addEventListener('click', () => {
+    openSuggestSheet(sunday, lookup, container);
+  });
+}
+
+// ── AI-forslag til aftensmad for ugens tomme slots ────────────────
+async function openSuggestSheet(sunday, lookup, container) {
+  // Find dage i ugen uden aftensmad
+  const emptyDates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    const ds = dateStr(d);
+    if (!lookup[`${ds}|dinner`]) emptyDates.push(ds);
+  }
+
+  if (emptyDates.length === 0) {
+    toast('Alle aftensmad-slots i ugen er allerede udfyldt');
+    return;
+  }
+
+  const frag = document.createElement('div');
+  frag.innerHTML = `
+    <p style="font-size:0.88rem;color:var(--ink-muted);margin-bottom:14px;line-height:1.5">
+      Claude foreslår aftensmad til ugens ${emptyDates.length} tomme dag${emptyDates.length === 1 ? '' : 'e'}
+      ud fra jeres opskrifter og hvad I har fået for nylig.
+    </p>
+    <div id="sug-body">
+      <div class="ai-loading" style="padding:12px 0">
+        <span class="ai-spinner"></span>
+        <span>Claude tænker over ugen…</span>
+      </div>
+    </div>`;
+
+  openSheet('✨ Forslag til aftensmad', frag);
+
+  let suggestions, recipeById;
+  try {
+    const [result, allRecipes] = await Promise.all([ai.suggestWeek(emptyDates), recipesApi.list()]);
+    suggestions = result.suggestions;
+    recipeById  = Object.fromEntries(allRecipes.map(r => [r.id, r]));
+  } catch (e) {
+    frag.querySelector('#sug-body').innerHTML =
+      `<div class="ai-error" style="padding:8px 0">⚠️ ${esc(e.message)}</div>`;
+    return;
+  }
+
+  const body = frag.querySelector('#sug-body');
+  const DAY  = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+
+  const renderSuggestions = () => {
+    body.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'background:var(--bg);border-radius:12px;overflow:hidden;margin-bottom:14px';
+
+    for (const s of suggestions) {
+      const r   = recipeById[s.recipe_id];
+      if (!r) continue;
+      const d   = new Date(s.date + 'T00:00:00');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)';
+      row.innerHTML = `
+        <span style="font-size:1.4rem;width:30px;text-align:center">${esc(r.image || '🍽️')}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.72rem;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em">
+            ${DAY[d.getDay()]} ${d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' })}
+          </div>
+          <div style="font-family:var(--serif);font-weight:600;font-size:0.97rem">${esc(r.name)}</div>
+          ${s.reason ? `<div style="font-size:0.78rem;color:var(--ink-muted);font-style:italic">${esc(s.reason)}</div>` : ''}
+        </div>
+        <button class="sug-remove" style="background:none;border:none;color:var(--ink-muted);font-size:1.05rem;cursor:pointer;padding:4px" title="Fjern forslag">✕</button>`;
+
+      row.querySelector('.sug-remove').addEventListener('click', () => {
+        suggestions = suggestions.filter(x => x !== s);
+        if (suggestions.length === 0) { closeSheet(); return; }
+        renderSuggestions();
+      });
+      wrap.appendChild(row);
+    }
+    if (wrap.lastChild) wrap.lastChild.style.borderBottom = 'none';
+    body.appendChild(wrap);
+
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'btn btn-primary btn-full';
+    applyBtn.textContent = `Sæt ${suggestions.length} ret${suggestions.length === 1 ? '' : 'ter'} på madplanen`;
+    applyBtn.addEventListener('click', async () => {
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Gemmer…';
+      try {
+        for (const s of suggestions) {
+          const r = recipeById[s.recipe_id];
+          await mealplan.set(s.date, 'dinner', s.recipe_id, r?.servings || 4);
+        }
+        closeSheet();
+        toast('Madplanen er opdateret — indkøbslisten følger med');
+        renderMealplan(container);
+      } catch (e) {
+        toast('Fejl: ' + e.message);
+        applyBtn.disabled = false;
+      }
+    });
+    body.appendChild(applyBtn);
+
+    const spacer = document.createElement('div');
+    spacer.style.height = '12px';
+    body.appendChild(spacer);
+  };
+
+  renderSuggestions();
 }
 
 function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expandedDays, container) {
@@ -285,6 +398,34 @@ async function openRecipePicker(date, mealType, currentId, onDone) {
         <input type="text" placeholder="Søg opskrift…" id="picker-search">
       </div>`;
     frag.appendChild(searchWrap);
+
+    // Mest brugte retter som hurtigvalg-chips
+    let stats = [];
+    try { stats = await recipesApi.stats(); } catch { /* chips udelades */ }
+    const byId = Object.fromEntries(allRecipes.map(r => [r.id, r]));
+    const top  = stats
+      .filter(s => byId[s.recipe_id])
+      .sort((a, b) => b.times - a.times)
+      .slice(0, 5);
+
+    if (top.length > 0) {
+      const chips = document.createElement('div');
+      chips.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px';
+      for (const s of top) {
+        const r = byId[s.recipe_id];
+        const chip = document.createElement('button');
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:5px 11px;font-size:0.82rem;cursor:pointer;color:var(--ink)';
+        chip.innerHTML = `${esc(r.image || '🍽️')} <span style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>`;
+        chip.title = `Brugt ${s.times} gange`;
+        chip.addEventListener('click', async () => {
+          await mealplan.set(date, mealType, r.id, r.servings);
+          closeSheet();
+          onDone();
+        });
+        chips.appendChild(chip);
+      }
+      frag.appendChild(chips);
+    }
 
     const list = document.createElement('div');
     list.style.paddingBottom = '8px';

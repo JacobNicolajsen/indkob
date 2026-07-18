@@ -55,6 +55,9 @@ export const recipes = {
   update:     (id, data)    => req('PUT', `/recipes/${id}`, data),
   delete:     (id)          => req('DELETE', `/recipes/${id}`),
   categories: ()            => req('GET', '/recipes/categories/list'),
+  stats:      ()            => req('GET', '/recipes/stats/usage'),
+  uploadImage: (image_base64, media_type) =>
+                req('POST', '/recipes/upload-image', { image_base64, media_type }),
 };
 
 // ── Madplan ──────────────────────────────────────────────────────
@@ -85,6 +88,10 @@ export const shoppinglist = {
 // ── Claude AI ────────────────────────────────────────────────────
 export const ai = {
   importRecipe: (url) => req('POST', '/ai/import-recipe', { url }),
+  importRecipePhoto: (image_base64, media_type) =>
+                  req('POST', '/ai/import-recipe-photo', { image_base64, media_type }),
+  suggestWeek:  (dates) => req('POST', '/ai/suggest-week', { dates }),
+  parseItems:   (text)  => req('POST', '/ai/parse-items', { text }),
 };
 
 // ── Dagnoter ─────────────────────────────────────────────────────
