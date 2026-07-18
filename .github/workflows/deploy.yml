@@ -17,7 +17,7 @@ jobs:
           username: ${{ secrets.CPANEL_USER }}
           password: ${{ secrets.CPANEL_PASS }}
           script: |
-            cd ~/indkobsassistent
+            cd ~/repositories/indkob
             git pull origin main
             npm install --production
             # Genstart Node.js appen via cPanel's passenger restart
