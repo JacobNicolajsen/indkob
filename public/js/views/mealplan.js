@@ -1,5 +1,5 @@
 import { mealplan, recipes as recipesApi, notes as notesApi, ics as icsApi, ai } from '../api.js';
-import { openSheet, closeSheet, toast, setTopActions, printHtml, esc } from '../app.js';
+import { openSheet, closeSheet, toast, setTopActions, printHtml, esc, recipeIcon } from '../app.js';
 
 function autoResizeTextarea(el) {
   el.style.height = 'auto';
@@ -196,7 +196,7 @@ async function openSuggestSheet(sunday, lookup, container) {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)';
       row.innerHTML = `
-        <span style="font-size:1.4rem;width:30px;text-align:center">${esc(r.image || '🍽️')}</span>
+        <span style="font-size:1.4rem;width:30px;display:inline-flex;justify-content:center;align-items:center">${recipeIcon(r.image, 30)}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:0.72rem;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em">
             ${DAY[d.getDay()]} ${d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' })}
@@ -415,7 +415,7 @@ async function openRecipePicker(date, mealType, currentId, onDone) {
         const r = byId[s.recipe_id];
         const chip = document.createElement('button');
         chip.style.cssText = 'display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:5px 11px;font-size:0.82rem;cursor:pointer;color:var(--ink)';
-        chip.innerHTML = `${esc(r.image || '🍽️')} <span style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>`;
+        chip.innerHTML = `${recipeIcon(r.image, 20)} <span style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</span>`;
         chip.title = `Brugt ${s.times} gange`;
         chip.addEventListener('click', async () => {
           await mealplan.set(date, mealType, r.id, r.servings);
@@ -439,7 +439,7 @@ async function openRecipePicker(date, mealType, currentId, onDone) {
         const row = document.createElement('div');
         row.className = 'list-item';
         row.innerHTML = `
-          <span style="font-size:1.5rem;width:32px;text-align:center">${esc(r.image || '🍽️')}</span>
+          <span style="font-size:1.5rem;width:32px;display:inline-flex;justify-content:center;align-items:center">${recipeIcon(r.image, 32)}</span>
           <div style="flex:1">
             <div style="font-family:var(--serif);font-size:1rem;font-weight:600">${esc(r.name)}</div>
             <div style="font-size:0.75rem;color:var(--ink-muted)">${esc(r.category || '')}${r.category ? ' · ' : ''}${esc(r.servings)} pers.</div>

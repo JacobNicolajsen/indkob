@@ -27,6 +27,20 @@ export function safeUrl(v) {
   return '';
 }
 
+/**
+ * Renderer en opskrifts image-felt som emoji-tekst eller <img>-tag.
+ * Feltet kan være et emoji, en fuld URL eller en relativ sti (uploads/…).
+ */
+export function recipeIcon(image, px = 30) {
+  const v = String(image || '').trim() || '🍽️';
+  if (/^\p{Emoji}/u.test(v)) return esc(v);
+  // Kun værdier der ligner en URL/sti renderes som billede — alt andet får fallback
+  if (!/^https?:\/\//i.test(v) && !v.includes('/')) return '🍽️';
+  const url = safeUrl(v);
+  if (!url) return '🍽️';
+  return `<img src="${url}" style="width:${px}px;height:${px}px;border-radius:8px;object-fit:cover;flex-shrink:0" alt="">`;
+}
+
 // Katalog er sub-side under "Mere" — ingen egen nav-knap
 const views = {
   mealplan:     { title: 'Madplan',     render: renderMealplan,     navKey: 'mealplan' },
