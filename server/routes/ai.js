@@ -15,7 +15,12 @@ function getClient(res) {
     res.status(500).json({ error: 'ANTHROPIC_API_KEY er ikke sat på serveren' });
     return null;
   }
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  // Brug Nodes indbyggede fetch — SDK'ets medfølgende node-fetch fejler
+  // med "Premature close" på denne host
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    fetch:  (...args) => globalThis.fetch(...args),
+  });
 }
 
 /** Fjerner evt. markdown-hegn og parser JSON fra Claudes svar */
