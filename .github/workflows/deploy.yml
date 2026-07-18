@@ -15,10 +15,11 @@ jobs:
         with:
           host:     ${{ secrets.CPANEL_HOST }}
           username: ${{ secrets.CPANEL_USER }}
-          password: ${{ secrets.CPANEL_PASS }}
+          key:      ${{ secrets.CPANEL_SSH_KEY }}
           script: |
             cd ~/repositories/indkob
             git pull origin main
             npm install --production
-            # Genstart Node.js appen via cPanel's passenger restart
-            touch tmp/restart.txt
+            # Genstart: restart.txt virker ikke på denne host — dræb lsnode-processen,
+            # den respawner automatisk ved næste request
+            pkill -9 -f lsnode || true
