@@ -1,4 +1,4 @@
-const CACHE = 'indkob-v9';
+const CACHE = 'indkob-v10';
 
 const STATIC = [
   '/indkob/',

@@ -173,8 +173,11 @@ async function openSuggestSheet(sunday, lookup, container) {
   let suggestions, recipeById;
   try {
     const [result, allRecipes] = await Promise.all([ai.suggestWeek(emptyDates), recipesApi.list()]);
-    suggestions = result.suggestions;
     recipeById  = Object.fromEntries(allRecipes.map(r => [r.id, r]));
+    // Kun forslag vi kan slå op — og giv hvert forslag sit eget portionsantal
+    suggestions = (result.suggestions || [])
+      .filter(s => recipeById[s.recipe_id])
+      .map(s => ({ ...s, servings: recipeById[s.recipe_id].servings || 4 }));
   } catch (e) {
     frag.querySelector('#sug-body').innerHTML =
       `<div class="ai-error" style="padding:8px 0">⚠️ ${esc(e.message)}</div>`;
@@ -184,31 +187,79 @@ async function openSuggestSheet(sunday, lookup, container) {
   const body = frag.querySelector('#sug-body');
   const DAY  = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
 
+  const dayLabel = (ds) => {
+    const d = new Date(ds + 'T00:00:00');
+    return `${DAY[d.getDay()]} ${d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' })}`;
+  };
+
+  // Flyt et forslag til en ny dag — bytter plads hvis dagen er optaget
+  const moveTo = (s, newDate) => {
+    const occupant = suggestions.find(x => x !== s && x.date === newDate);
+    if (occupant) occupant.date = s.date;
+    s.date = newDate;
+    suggestions.sort((a, b) => a.date.localeCompare(b.date));
+  };
+
   const renderSuggestions = () => {
     body.innerHTML = '';
+
+    if (suggestions.length === 0) {
+      body.innerHTML = `
+        <p style="text-align:center;color:var(--ink-muted);font-style:italic;padding:18px 0 14px">
+          Ingen forslag tilbage — ugen forbliver tom.
+        </p>`;
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn btn-full';
+      closeBtn.textContent = 'Luk';
+      closeBtn.addEventListener('click', () => closeSheet());
+      body.appendChild(closeBtn);
+      const sp = document.createElement('div');
+      sp.style.height = '12px';
+      body.appendChild(sp);
+      return;
+    }
+
     const wrap = document.createElement('div');
     wrap.style.cssText = 'background:var(--bg);border-radius:12px;overflow:hidden;margin-bottom:14px';
 
     for (const s of suggestions) {
       const r   = recipeById[s.recipe_id];
-      if (!r) continue;
-      const d   = new Date(s.date + 'T00:00:00');
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)';
       row.innerHTML = `
         <span style="font-size:1.4rem;width:30px;display:inline-flex;justify-content:center;align-items:center">${recipeIcon(r.image, 30)}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:0.72rem;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em">
-            ${DAY[d.getDay()]} ${d.toLocaleDateString('da-DK', { day:'numeric', month:'numeric' })}
-          </div>
+          <select class="sug-day" title="Flyt til anden dag"
+                  style="font-size:0.72rem;font-weight:700;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em;background:none;border:none;padding:0;margin:0 0 1px -2px;cursor:pointer;font-family:inherit;max-width:100%">
+            ${emptyDates.map(ds =>
+              `<option value="${ds}"${ds === s.date ? ' selected' : ''}>${esc(dayLabel(ds))}</option>`
+            ).join('')}
+          </select>
           <div style="font-family:var(--serif);font-weight:600;font-size:0.97rem">${esc(r.name)}</div>
           ${s.reason ? `<div style="font-size:0.78rem;color:var(--ink-muted);font-style:italic">${esc(s.reason)}</div>` : ''}
         </div>
-        <button class="sug-remove" style="background:none;border:none;color:var(--ink-muted);font-size:1.05rem;cursor:pointer;padding:4px" title="Fjern forslag">✕</button>`;
+        <div class="servings-stepper" title="Antal portioner">
+          <button class="step-btn sug-minus" aria-label="Færre portioner">−</button>
+          <span class="step-count">${s.servings}</span>
+          <button class="step-btn sug-plus" aria-label="Flere portioner">+</button>
+        </div>
+        <button class="sug-remove" style="background:none;border:none;color:var(--ink-muted);font-size:1.05rem;cursor:pointer;padding:4px" title="Lad dagen stå tom">✕</button>`;
+
+      row.querySelector('.sug-day').addEventListener('change', (e) => {
+        moveTo(s, e.target.value);
+        renderSuggestions();
+      });
+
+      const countEl = row.querySelector('.step-count');
+      row.querySelector('.sug-minus').addEventListener('click', () => {
+        if (s.servings > 1) { s.servings--; countEl.textContent = s.servings; }
+      });
+      row.querySelector('.sug-plus').addEventListener('click', () => {
+        s.servings++; countEl.textContent = s.servings;
+      });
 
       row.querySelector('.sug-remove').addEventListener('click', () => {
         suggestions = suggestions.filter(x => x !== s);
-        if (suggestions.length === 0) { closeSheet(); return; }
         renderSuggestions();
       });
       wrap.appendChild(row);
@@ -224,8 +275,7 @@ async function openSuggestSheet(sunday, lookup, container) {
       applyBtn.textContent = 'Gemmer…';
       try {
         for (const s of suggestions) {
-          const r = recipeById[s.recipe_id];
-          await mealplan.set(s.date, 'dinner', s.recipe_id, r?.servings || 4);
+          await mealplan.set(s.date, 'dinner', s.recipe_id, s.servings);
         }
         closeSheet();
         toast('Madplanen er opdateret — indkøbslisten følger med');
@@ -242,6 +292,7 @@ async function openSuggestSheet(sunday, lookup, container) {
     body.appendChild(spacer);
   };
 
+  suggestions.sort((a, b) => a.date.localeCompare(b.date));
   renderSuggestions();
 }
 
