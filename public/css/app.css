@@ -477,6 +477,36 @@ html, body {
 
 .meal-slot:active { background: var(--bg); }
 
+/* Drag & drop af retter */
+.meal-slot[data-date] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.meal-slot--dragging { opacity: 0.4; }
+.meal-slot--drop {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 2px var(--sage);
+}
+.meal-drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: 70vw;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
 .meal-type-label {
   font-size: 0.62rem;
   font-weight: 700;

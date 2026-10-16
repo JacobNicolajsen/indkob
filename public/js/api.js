@@ -65,6 +65,8 @@ export const mealplan = {
   list:       (from, to)                       => req('GET', `/mealplan?from=${from}&to=${to}`),
   set:        (date, meal_type, recipe_id, servings) =>
                 req('POST', '/mealplan', { date, meal_type, recipe_id, servings }),
+  move:       (from_date, from_meal_type, to_date, to_meal_type) =>
+                req('POST', '/mealplan/move', { from_date, from_meal_type, to_date, to_meal_type }),
   remove:     (id)                             => req('DELETE', `/mealplan/${id}`),
   removeSlot: (date, meal_type)                => req('DELETE', `/mealplan/slot/${date}/${meal_type}`),
 };

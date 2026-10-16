@@ -375,6 +375,8 @@ function buildDayCard(ds, dayIndex, dateObj, isToday, isExpanded, lookup, expand
 function buildMealSlot(ds, mt, entry, expandedDays, container) {
   const slot = document.createElement('div');
   slot.className = 'meal-slot';
+  slot.dataset.date = ds;
+  slot.dataset.meal = mt.key;
   slot.innerHTML = `
     <span class="meal-type-label">${mt.label}</span>
     <span class="meal-recipe ${entry ? '' : 'empty'}">${entry ? esc(entry.recipe_name) : 'Tilføj ret…'}</span>
@@ -414,9 +416,12 @@ function buildMealSlot(ds, mt, entry, expandedDays, container) {
     stepper.querySelector('.step-plus').addEventListener('click', () => {
       applyServings(servings + 1);
     });
+
+    enableSlotDrag(slot, entry, container);
   }
 
   slot.addEventListener('click', async (e) => {
+    if (slot.dataset.dragged) { delete slot.dataset.dragged; return; }
     if (e.target.classList.contains('meal-remove')) {
       await mealplan.remove(e.target.dataset.id);
       renderMealplan(container);
@@ -426,6 +431,126 @@ function buildMealSlot(ds, mt, entry, expandedDays, container) {
   });
 
   return slot;
+}
+
+// ── Drag & drop af retter mellem dage/måltider ───────────────────
+// Touch: hold fingeren ~0,35 s på retten, træk. Mus: træk direkte.
+// Flytning ændrer ikke indkøbslistens mængder — kun hvilken dag varen står under.
+function enableSlotDrag(slot, entry, container) {
+  const LONG_PRESS_MS = 350;
+  const MOVE_TOLERANCE = 8;
+
+  let startX = 0, startY = 0, pressTimer = null, dragging = false, pointerId = null;
+  let ghost = null, target = null, scrollRaf = null, lastY = 0;
+  const scroller = document.getElementById('view-container') || document.scrollingElement;
+
+  const blockTouchScroll = (e) => { if (dragging) e.preventDefault(); };
+
+  const startDrag = (x, y) => {
+    dragging = true;
+    navigator.vibrate?.(15);
+    slot.classList.add('meal-slot--dragging');
+    ghost = document.createElement('div');
+    ghost.className = 'meal-drag-ghost';
+    ghost.textContent = entry.recipe_name;
+    document.body.appendChild(ghost);
+    moveGhost(x, y);
+    document.addEventListener('touchmove', blockTouchScroll, { passive: false });
+    autoScroll();
+  };
+
+  const moveGhost = (x, y) => {
+    lastY = y;
+    ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -120%)`;
+    ghost.style.visibility = 'hidden';
+    const el = document.elementFromPoint(x, y)?.closest('.meal-slot[data-date]');
+    ghost.style.visibility = '';
+    const next = el && el !== slot ? el : null;
+    if (next !== target) {
+      target?.classList.remove('meal-slot--drop');
+      target = next;
+      target?.classList.add('meal-slot--drop');
+    }
+  };
+
+  // Rul automatisk når man trækker tæt på kanten
+  const autoScroll = () => {
+    if (!dragging) return;
+    const rect = scroller.getBoundingClientRect?.() || { top: 0, bottom: innerHeight };
+    const edge = 70;
+    if (lastY < rect.top + edge)         scroller.scrollTop -= 12;
+    else if (lastY > rect.bottom - edge) scroller.scrollTop += 12;
+    scrollRaf = requestAnimationFrame(autoScroll);
+  };
+
+  const cleanup = () => {
+    clearTimeout(pressTimer);
+    pressTimer = null;
+    cancelAnimationFrame(scrollRaf);
+    document.removeEventListener('touchmove', blockTouchScroll);
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onCancel);
+    slot.classList.remove('meal-slot--dragging');
+    target?.classList.remove('meal-slot--drop');
+    ghost?.remove();
+    ghost = null;
+    pointerId = null;
+  };
+
+  const onMove = (e) => {
+    if (e.pointerId !== pointerId) return;
+    if (dragging) { moveGhost(e.clientX, e.clientY); return; }
+    const moved = Math.hypot(e.clientX - startX, e.clientY - startY) > MOVE_TOLERANCE;
+    if (!moved) return;
+    if (e.pointerType === 'mouse') startDrag(e.clientX, e.clientY);
+    else cleanup(); // fingeren flyttede sig før long-press → det er en scroll
+  };
+
+  const onUp = async (e) => {
+    if (e.pointerId !== pointerId) return;
+    const wasDragging = dragging;
+    const drop = target;
+    dragging = false;
+    cleanup();
+    if (!wasDragging) return;
+
+    slot.dataset.dragged = '1'; // undertryk klikket der følger pointerup
+    setTimeout(() => delete slot.dataset.dragged, 400);
+    if (!drop) return;
+
+    try {
+      const res = await mealplan.move(slot.dataset.date, slot.dataset.meal, drop.dataset.date, drop.dataset.meal);
+      toast(res.swapped ? 'Retterne har byttet plads' : 'Retten er flyttet');
+    } catch (err) {
+      toast('Kunne ikke flytte: ' + err.message);
+    }
+    const scrollPos = scroller.scrollTop;
+    await renderMealplan(container);
+    scroller.scrollTop = scrollPos;
+  };
+
+  const onCancel = (e) => {
+    if (e.pointerId !== pointerId) return;
+    dragging = false;
+    cleanup();
+  };
+
+  slot.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || pointerId !== null) return;
+    if (e.target.closest('.servings-stepper, .meal-remove')) return;
+    pointerId = e.pointerId;
+    startX = e.clientX; startY = e.clientY;
+    if (e.pointerType !== 'mouse') {
+      pressTimer = setTimeout(() => startDrag(startX, startY), LONG_PRESS_MS);
+    }
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onCancel);
+  });
+
+  // Undgå kontekstmenu/tekstmarkering ved long-press på mobil
+  slot.addEventListener('contextmenu', (e) => { if (pressTimer || dragging) e.preventDefault(); });
 }
 
 async function openRecipePicker(date, mealType, currentId, onDone) {
