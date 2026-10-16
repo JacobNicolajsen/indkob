@@ -2,6 +2,7 @@ import { recipes as api, ai } from '../api.js';
 import { openSheet, closeSheet, toast, setTopActions, esc, safeUrl } from '../app.js';
 import { openProductPicker } from './catalog.js';
 import { UNITS, RECIPE_CATEGORIES, CAT_ICONS, unitOptions, catOptions } from '../constants.js';
+import { renderRecipeText } from '../recipeFormat.js';
 
 let searchTimeout = null;
 let currentSearch = '';
@@ -145,9 +146,6 @@ async function openRecipeDetail(id, container) {
     <div style="text-align:center;font-size:4rem;padding:4px 0 8px">
       ${isEmoji ? esc(emoji) : `<img src="${safeUrl(emoji)}" style="width:100%;border-radius:12px;max-height:180px;object-fit:cover">`}
     </div>
-    ${recipe.description
-      ? `<p style="color:var(--ink-muted);margin:0 0 14px;line-height:1.6;font-size:0.95rem">${esc(recipe.description)}</p>`
-      : ''}
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <span class="badge badge-terra">${esc(recipe.category || 'Ingen kategori')}</span>
       <span class="badge badge-sage">👥 ${esc(recipe.servings)} pers.</span>
@@ -160,6 +158,9 @@ async function openRecipeDetail(id, container) {
       </a>` : ''}
     <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600;margin-bottom:8px">Ingredienser</div>
     <div id="ing-list" style="margin-bottom:20px"></div>
+    ${recipe.description?.trim() ? `
+      <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600;margin-bottom:8px">Fremgangsmåde</div>
+      <div class="rx-body">${renderRecipeText(recipe.description)}</div>` : ''}
     <div style="display:flex;gap:10px;padding-bottom:8px">
       <button class="btn btn-outline" id="btn-edit-recipe" style="flex:1">Rediger</button>
       <button class="btn btn-danger"  id="btn-delete-recipe" style="flex:1">Slet</button>
@@ -367,8 +368,14 @@ function openRecipeForm(recipe, onSave) {
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Beskrivelse</label>
-      <textarea class="form-textarea" id="f-desc" placeholder="Kort beskrivelse…">${esc(recipe?.description || '')}</textarea>
+      <label class="form-label">Fremgangsmåde</label>
+      <textarea class="form-textarea rx-textarea" id="f-desc" rows="10"
+        placeholder="1. Første trin…&#10;2. Næste trin…">${esc(recipe?.description || '')}</textarea>
+      <div class="rx-help">
+        Ét trin pr. linje: <code>1.</code> <code>2.</code> … · <code>## Overskrift</code> ·
+        <code>- punkt</code> · <code>Tip: …</code> · <code>**ingrediens**</code> fremhæves.
+        Tider, temperaturer og mængder fremhæves automatisk.
+      </div>
     </div>
     <div style="font-family:var(--serif);font-size:1.05rem;font-weight:600;margin-bottom:10px">Ingredienser</div>
     <div id="ing-rows"></div>

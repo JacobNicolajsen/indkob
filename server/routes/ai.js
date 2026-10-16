@@ -32,7 +32,7 @@ function parseJsonReply(msg) {
 
 const RECIPE_JSON_SPEC = `{
   "name": "opskriftens navn på dansk",
-  "description": "ALLE trin i fremgangsmåden som sammenhængende tekst — bevar nummerering og detaljer. Inkluder forberedelse, tilberedning og anretning.",
+  "description": "ALLE trin i fremgangsmåden i opskriftsformatet beskrevet nedenfor — bevar alle detaljer. Inkluder forberedelse, tilberedning og anretning.",
   "servings": 4,
   "category": "én af: ${VALID_CAT.join(', ')}",
   "image": "ét enkelt passende emoji",
@@ -50,7 +50,15 @@ Regler:
 - amount skal være et tal (eller null hvis ikke angivet)
 - Brug metriske enheder (g, ml, dl, L) frem for udenlandske
 - Oversæt ingrediensnavne til dansk hvis de er på andet sprog
-- Bevar alle mål præcist som angivet i opskriften`;
+- Bevar alle mål præcist som angivet i opskriften
+
+Opskriftsformat for "description" (linjer adskilt af \\n):
+- Ét trin pr. linje, nummereret "1. ", "2. " osv. Et trin er én handling på 1-3 sætninger
+- Har opskriften flere dele (fx dej og fyld), indled hver del med en linje "## Navn" og start nummereringen forfra
+- Gode råd eller variationer på en linje der starter med "Tip: "
+- Sæt ingrediensnavne i **dobbelte stjerner** første gang de nævnes i et trin, fx "Svits **løg** og **hvidløg**"
+- Skriv tider, temperaturer og mængder med tal ("10 min", "200 grader", "2 dl") — de fremhæves automatisk
+- Ingen anden markdown (ingen kursiv, links eller tabeller)`;
 
 /**
  * Validerer parsed opskrift, opretter manglende produkter og gemmer

@@ -750,6 +750,120 @@ html, body {
 }
 
 /* =====================================================
+   FREMGANGSMÅDE (opskriftsformat, se js/recipeFormat.js)
+   ===================================================== */
+
+.rx-body {
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.rx-para {
+  margin: 0 0 12px;
+  color: var(--ink-muted);
+}
+
+.rx-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--terra-deep);
+  margin: 16px 0 8px;
+}
+.rx-heading:first-child { margin-top: 0; }
+
+.rx-steps {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.rx-step {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rx-step:last-child { border-bottom: none; }
+
+.rx-step-n {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--terra);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.rx-step-text { flex: 1; min-width: 0; }
+
+.rx-bullets {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.rx-bullets li { margin-bottom: 4px; }
+
+.rx-tip {
+  background: var(--amber-light);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  font-size: 0.9rem;
+}
+.rx-tip-label { font-weight: 700; }
+
+.rx-ing {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.rx-qty {
+  font-weight: 700;
+  color: var(--terra-deep);
+  white-space: nowrap;
+}
+
+.rx-chip {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 0.85em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rx-time { background: var(--sage-light);  color: var(--sage); }
+.rx-temp { background: var(--terra-light); color: var(--terra-deep); }
+
+.rx-textarea {
+  min-height: 180px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.rx-help {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  line-height: 1.5;
+}
+.rx-help code {
+  background: var(--terra-light);
+  color: var(--terra-deep);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 0.95em;
+}
+
+/* =====================================================
    INGREDIENS-LISTE (sheet form)
    ===================================================== */
 

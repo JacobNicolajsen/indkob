@@ -1,10 +1,11 @@
-const CACHE = 'indkob-v11';
+const CACHE = 'indkob-v12';
 
 const STATIC = [
   '/indkob/',
   '/indkob/js/app.js',
   '/indkob/js/api.js',
   '/indkob/js/constants.js',
+  '/indkob/js/recipeFormat.js',
   '/indkob/js/views/mealplan.js',
   '/indkob/js/views/recipes.js',
   '/indkob/js/views/shoppinglist.js',
