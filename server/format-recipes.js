@@ -18,6 +18,13 @@ const NO_HIGHLIGHT = new Set(['vand', 'salt', 'peber', 'salt og peber', 'is']);
 // Forkortelser der slutter med punktum uden at afslutte sætningen
 const ABBREV = /\b(?:ca|evt|fx|bl\.a|dvs|osv|nr|pkt)\.$/i;
 
+// Afsnitsmærke: kort tekst med stort begyndelsesbogstav efterfulgt af kolon,
+// fx "Dej:", "Til karrysaucen:", "Topping til brændende kærlighed:"
+const LABEL       = String.raw`(\p{Lu}[^.:!?\d\n]{0,39}):`;
+const LABEL_START = new RegExp(String.raw`^${LABEL}\s+(?=\p{Lu})`, 'u');
+const LABEL_ANY   = new RegExp(String.raw`(^|[.!?]\s+)${LABEL}\s+(?=\p{Lu})`, 'gu');
+const LABEL_END   = new RegExp(String.raw`(?<=[.!?]\s+)${LABEL}$`, 'u');
+
 const reEscape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Deler en tekst i sætninger uden at splitte efter "ca.", "fx." osv. */
@@ -88,7 +95,8 @@ function ingredientKeys(names) {
  * ingredientNames: navnene på opskriftens ingredienser (til fremhævning).
  */
 function toRecipeFormat(desc, ingredientNames = []) {
-  const src = String(desc ?? '').replace(/\r\n?/g, '\n').trim();
+  const src = String(desc ?? '').replace(/\r\n?/g, '\n').trim()
+    .replace(/^fremgangsmåde\s*:\s*/i, '');   // overflødigt — afsnittet hedder allerede sådan
   if (!src) return '';
 
   // Kort beskrivelse på én sætning ("Hurtig hverdagsret") er en intro, ikke et trin
@@ -123,19 +131,21 @@ function toRecipeFormat(desc, ingredientNames = []) {
   }
 
   // 3. Løs tekst bliver til trin. Har opskriften allerede nummererede
-  //    trin, beholdes tekst før første trin som intro; ellers deles
-  //    teksten i sætninger, og korte sætninger slås sammen til ét trin.
+  //    trin, bevares forfatterens inddeling; tekst før første trin er intro.
+  //    Ellers deles teksten i sætninger, og korte sætninger slås sammen.
+  //    Afsnitsmærker som "Dej:" eller "Til saucen:" bliver til overskrifter.
   const hasNumbered = items.some(i => i.numbered);
   const firstStep   = items.findIndex(i => i.type === 'step' || i.type === 'heading');
+  const paraLines   = items.filter(i => i.type === 'para').length;
+  // Er første trin et afsnitsmærke ("1. Pølsebrød: …"), er hele opskriften inddelt i afsnit
+  const sectioned   = hasNumbered && LABEL_START.test(items.find(i => i.numbered).text);
+
   const result = [];
-  items.forEach((it, idx) => {
-    if (it.type !== 'para') { result.push(it); return; }
-    if (hasNumbered) {
-      result.push(idx < firstStep ? it : { type: 'step', text: it.text });
-      return;
-    }
+  const pushProse = text => {
+    // Forfatterens egne korte linjer ("Bacon ristes") er allerede trin
+    if (paraLines > 1 && text.length <= 200) { result.push({ type: 'step', text }); return; }
     let cur = '';
-    for (const s of sentences(it.text)) {
+    for (const s of sentences(text)) {
       cur = cur ? `${cur} ${s}` : s;
       if (cur.length >= 60) { result.push({ type: 'step', text: cur }); cur = ''; }
     }
@@ -144,6 +154,30 @@ function toRecipeFormat(desc, ingredientNames = []) {
       if (prev?.type === 'step' && cur.length < 30) prev.text += ' ' + cur;
       else result.push({ type: 'step', text: cur });
     }
+  };
+  // Deler tekst ved afsnitsmærker i starten af en sætning
+  const pushLabelled = (text, asProse) => {
+    for (const part of text.replace(LABEL_ANY, '$1\n## $2\n').split('\n')) {
+      const t = part.trim();
+      if (!t) continue;
+      if (t.startsWith('## ')) result.push({ type: 'heading', text: t.slice(3) });
+      else if (asProse) pushProse(t);
+      else result.push({ type: 'step', text: t });
+    }
+  };
+
+  items.forEach((it, idx) => {
+    if (it.type === 'step' && it.numbered) {
+      if (sectioned && LABEL_START.test(it.text)) { pushLabelled(it.text, true); return; }
+      // Mærke sidst i et trin ("… Server kølig raita. Til raita:") hører til næste trin
+      const m = it.text.match(LABEL_END);
+      result.push({ type: 'step', text: m ? it.text.slice(0, m.index).trim() : it.text });
+      if (m) result.push({ type: 'heading', text: m[1] });
+      return;
+    }
+    if (it.type !== 'para') { result.push(it); return; }
+    if (hasNumbered) result.push(idx < firstStep ? it : { type: 'step', text: it.text });
+    else pushLabelled(it.text, true);
   });
 
   // 4. Fremhæv ingredienser og skriv ud med fortløbende numre
